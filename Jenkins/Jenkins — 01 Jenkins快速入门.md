@@ -1,3 +1,9 @@
+## Jenkins — 01 Jenkins快速入门
+
+
+
+
+
 ## 一、jenkins是什么？
 
 Jenkins是一个开源的、界面操作友好的持续集成(CI)工具，起源于Hudson（Hudson是商用的），**主要用于持续、自动的构建/测试软件项目、监控外部任务的运行**。**Jenkins用Java语言编写，可在Tomcat等流行的servlet容器中运行，也可独立运行**。通常与常见的的版本控制工具SVN、GIT以及构建工具Maven、Ant、Gradle结合使用。
