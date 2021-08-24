@@ -183,7 +183,7 @@ Maven需要配置两项东西，一个是 `settings.xml` 文件的路径
 
 **JDK 配置**
 
-JDK配置一下别名 以及 JAVA_HOME 的路径就可以了
+JDK配置一下别名以及 JAVA_HOME 的路径就可以了
 
 ![](https://image.easyblog.top/QQ%E6%88%AA%E5%9B%BE20210822165511.png)
 
@@ -191,7 +191,7 @@ JDK配置一下别名 以及 JAVA_HOME 的路径就可以了
 
 **Git 配置**
 
-Git也不用过多配置，一般只有配置一下别名就好了
+Git也不用过多配置，一般只用配置一下别名就好了
 
 ![](https://image.easyblog.top/QQ%E6%88%AA%E5%9B%BE20210822165522.png)
 
