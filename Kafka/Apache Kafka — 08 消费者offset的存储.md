@@ -8,7 +8,7 @@
 
 由于 consumer 在消费过程中可能会出现断电宕机等故障， consumer 恢复后，需要从故障前的位置的继续消费，所以 **consumer 需要实时记录自己消费到了哪个 offset**，以便故障恢复后继续消费。
 
-<img src="https://gitee.com/jallenkwong/LearnKafka/raw/master/image/13.png" alt="img" style="zoom:70%;" />
+<img src="https://image.easyblog.top/13.png" alt="img" style="zoom:70%;" />
 
 
 

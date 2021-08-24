@@ -22,7 +22,7 @@
 
 Spring事务领头人叫 `Juergen Hoeller`，先混个脸熟哈，他写了几乎全部的Spring事务代码。读源码先拜神，掌握他的源码的风格，读起来会通畅很多。最后一节咱们总结下这个大神的代码风格。
 
-![](https://images2018.cnblogs.com/blog/584866/201809/584866-20180906151913868-1478211392.png)
+![](https://image.easyblog.top/584866-20180906151913868-1478211392.png)
 
 ### 1.2 事务的定义
 
@@ -30,7 +30,7 @@ Spring事务领头人叫 `Juergen Hoeller`，先混个脸熟哈，他写了几�
 
 Spring对于事务的支持，分层概览图如下：
 
-<img src="img/%E6%88%AA%E5%B1%8F2021-08-04%20%E4%B8%8B%E5%8D%884.41.32.png" style="zoom:50%;" />
+<img src="https://image.easyblog.top/%E6%88%AA%E5%B1%8F2021-08-04%20%E4%B8%8B%E5%8D%884.41.32.png" style="zoom:50%;" />
 
 ## 二、事务的ACID特性
 

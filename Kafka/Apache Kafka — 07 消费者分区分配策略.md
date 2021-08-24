@@ -18,7 +18,7 @@ Kafka提供了消费者客户端参数 `partition.assignment.strategy` 用来设
 
 ### 一、RangeAssignor 分配策略（默认分配策略）
 
-![](https://img2018.cnblogs.com/blog/1402378/201812/1402378-20181210165325890-1633597010.png)
+![](https://image.easyblog.top/1402378-20181210165325890-1633597010.png)
 
 RangeAssignor是**对每个Topic而言**的（即一个Topic一个Topic的分），首先对同一个Topic里面的分区按照序号进行排序，并对消费者按照字母顺序进行排序。然后用Partitions分区的个数除以消费者线程的总数来决定每个消费者线程消费几个分区。如果除不尽，那么前面几个消费者线程将会多消费一个分区。
 
@@ -58,7 +58,7 @@ C3：T1（7，8，9） T2（7，8，9）
 
 ### 二、RoundRobinAssignor 分配策略
 
-![](https://img2018.cnblogs.com/blog/1402378/201812/1402378-20181210164657270-1615029320.png)
+![](https://image.easyblog.top/1402378-20181210164657270-1615029320.png)
 
 RoundRobinAssignor分配策略的原理是**将消费组内所有消费者以及消费者所订阅的所有topic的partition按照字典序排序，然后通过轮询方式逐个将分区以此分配给每个消费者**。round-robin分配策略对应的`partition.assignment.strategy`参数值为：`org.apache.kafka.clients.consumer.RoundRobinAssignor`。
 

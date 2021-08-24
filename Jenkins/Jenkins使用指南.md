@@ -111,11 +111,6 @@ systemctl start jenkins
 注意⚠️	首次启动可能会遇到页面一直显示"Please wait while Jenkins is getting ready to work ..."，编辑 `/var/lib/jenkins/hudson.model.UpdateCenter.xml` 文件，将"https://updates.jenkins.io/update-center.json" 修改为 "http://mirror.xmission.com/jenkins/updates/update-center.json" 即可。
 
 
-一切配置完成之后，下图是首次来到Jenkins首页看到的欢迎页面，看到这个页面就表示Jenkins已经在我们的机器上安装并配置成功了。
-
-![](img/%E6%88%AA%E5%B1%8F2021-08-18%20%E4%B8%8B%E5%8D%887.27.02.png)
-
-
 
 ## 三、使用Jenkins进行Java代码(单元)测试、打包。
 
@@ -139,12 +134,4 @@ export PATH=$MAVEN_HOME/bin:$PATH
 //保存后在命令行输入,启动配置
 . /etc/profile
 ```
-
-
-
-
-
-首先点击页面 `新建Item` 创建一个新项目
-
-![](img/%E6%88%AA%E5%B1%8F2021-08-18%20%E4%B8%8B%E5%8D%887.34.24.png)
 

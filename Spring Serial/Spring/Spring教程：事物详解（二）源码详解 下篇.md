@@ -29,7 +29,7 @@
 
 由于采用声明式@Transactional这种注解的方式，那么我们从SpringBoot 启动时的自动配置载入开始看。在SpringBoot autoconfigure包下的/META-INF/spring.factories中配置文件中查找到有关声明式事物的自动配置，如下图：
 
-![](img/%E6%88%AA%E5%B1%8F2021-08-04%20%E4%B8%8B%E5%8D%887.37.13.png)
+![](https://image.easyblog.top/%E6%88%AA%E5%B1%8F2021-08-04%20%E4%B8%8B%E5%8D%887.37.13.png)
 
 发现，SpringBoot载入2个关于事务的自动配置类： 
 
@@ -44,7 +44,7 @@ TransactionAutoConfiguration这个类主要看：两个类注解 和 两个内�
 
 #### 2.1.1 两个类注解
 
-![](img/%E6%88%AA%E5%B1%8F2021-08-04%20%E4%B8%8B%E5%8D%887.52.08.png)
+![](https://image.easyblog.top/%E6%88%AA%E5%B1%8F2021-08-04%20%E4%B8%8B%E5%8D%887.52.08.png)
 
 * `@ConditionalOnClass(PlatformTransactionManager.class)` 会在类路径下包含PlatformTransactionManager这个类时这个自动配置生效，这个类是Spring事务的核心包，肯定引入了。
 
@@ -54,7 +54,7 @@ TransactionAutoConfiguration这个类主要看：两个类注解 和 两个内�
 
 **TransactionTemplateConfiguration 事务模板配置类**
 
-![](img/%E6%88%AA%E5%B1%8F2021-08-04%20%E4%B8%8B%E5%8D%887.55.00.png)
+![](https://image.easyblog.top/%E6%88%AA%E5%B1%8F2021-08-04%20%E4%B8%8B%E5%8D%887.55.00.png)
 
 有两个注解，含义分别如下：
 
@@ -64,7 +64,7 @@ TransactionAutoConfiguration这个类主要看：两个类注解 和 两个内�
 
 **EnableTransactionManagementConfiguration  开启事务管理器配置类**
 
-![](img/%E6%88%AA%E5%B1%8F2021-08-04%20%E4%B8%8B%E5%8D%887.58.46.png)
+![](https://image.easyblog.top/%E6%88%AA%E5%B1%8F2021-08-04%20%E4%B8%8B%E5%8D%887.58.46.png)
 
 在源码中我们还可以看到，EnableTransactionManagementConfiguration支持2种代理方式：**JdkDynamicAutoProxyConfiguration** 和 **CglibAutoProxyConfiguration**
 
@@ -83,7 +83,7 @@ TransactionAutoConfiguration这个类主要看：两个类注解 和 两个内�
 
 看到这里，我们需要对`@EnableTransactionManagement`注解做一个更深的认识，下图所示是其源码。
 
-![](img/%E6%88%AA%E5%B1%8F2021-08-05%20%E4%B8%8A%E5%8D%889.11.22.png)
+![](https://image.easyblog.top/%E6%88%AA%E5%B1%8F2021-08-05%20%E4%B8%8A%E5%8D%889.11.22.png)
 
 * **proxyTargetClass** ：值为false表示是JDK动态代理支持接口代理。true表示是Cglib代理支持子类继承代理。
 * **mode**：事务通知模式(切面织入方式)，默认代理模式（同一个类中方法互相调用拦截器不会生效），可以选择增强型AspectJ
@@ -91,11 +91,11 @@ TransactionAutoConfiguration这个类主要看：两个类注解 和 两个内�
 
 属性先说这么多，这个注解重点还是看它头上的`@Import(TransactionManagementConfigurationSelector.class)` 这个注解。@Import注解的功能不用多说，它就是用来导入配置的，重点关注配置类**TransactionManagementConfigurationSelector**，类图如下：
 
-![](img/%E6%88%AA%E5%B1%8F2021-08-05%20%E4%B8%8A%E5%8D%889.58.18.png)
+![](https://image.easyblog.top/%E6%88%AA%E5%B1%8F2021-08-05%20%E4%B8%8A%E5%8D%889.58.18.png)
 
 如上图所示，TransactionManagementConfigurationSelector继承自AdviceModeImportSelector实现了ImportSelector接口。
 
-![](img/%E6%88%AA%E5%B1%8F2021-08-05%20%E4%B8%8A%E5%8D%8810.00.22.png)
+![](https://image.easyblog.top/%E6%88%AA%E5%B1%8F2021-08-05%20%E4%B8%8A%E5%8D%8810.00.22.png)
 
 如上图，最终会执行selectImports方法导入需要加载的类，我们只看**PROXY**模式下，载入了AutoProxyRegistrar、ProxyTransactionManagementConfiguration2个类。
 
@@ -114,4 +114,4 @@ TransactionAutoConfiguration这个类主要看：两个类注解 和 两个内�
 
 最后，整理了一下声明式事物工作时序图，建议收藏！
 
-![](img/584866-20180925191041500-2119850677.jpg)
+![](https://image.easyblog.top/584866-20180925191041500-2119850677.jpg)

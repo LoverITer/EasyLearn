@@ -18,7 +18,7 @@ $ java -version
 
 打开Apache Kafka官网 [http://kafka.apache.org/downloads](http://kafka.apache.org/downloads) 下载Kafka的**tgz**安装包
 
-![截屏2021-07-21 下午1.51.36](https://image.easyblog.top/%E6%88%AA%E5%B1%8F2021-07-21%20%E4%B8%8B%E5%8D%881.51.36.png)
+![](https://image.easyblog.top/%E6%88%AA%E5%B1%8F2021-07-21%20%E4%B8%8B%E5%8D%881.51.36.png)
 
 然后解压并进入kafka路径下，
 
@@ -80,7 +80,7 @@ zookeeper.connect=localhost:2181
 
 根据你的机器内存大小合理修改 `bin/kafka-server-start.sh` 文件中的 `KAFKA_HEAP_OPTS` 的值，但是也不能太小，设置的太小kafka也会无法启动起来。
 
-![截屏2021-07-21 下午5.13.20](https://image.easyblog.top/%E6%88%AA%E5%B1%8F2021-07-21%20%E4%B8%8B%E5%8D%885.13.20.png)
+![](https://image.easyblog.top/%E6%88%AA%E5%B1%8F2021-07-21%20%E4%B8%8B%E5%8D%885.13.20.png)
 
 
 

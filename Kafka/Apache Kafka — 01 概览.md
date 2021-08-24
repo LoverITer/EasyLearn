@@ -1,6 +1,6 @@
 ### 教程说明
 
-![1482907899673467](https://image.easyblog.top/1482907899673467.png)
+![](https://image.easyblog.top/1482907899673467.png)
 
 Kafka是一个分布式、分区的、多副本的、多订阅者，基于zookeeper协调的分布式日志系统，其主要特点为：
 

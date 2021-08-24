@@ -8,7 +8,7 @@
 
 Kafka中Topic的概念，它是承载真实数据的逻辑容器，而在Topic之下还分为若干个分区，也就是说Kafka的消息组织方式实际上是三级结构：**Topic-Partition-Message**。主题下的每条消息只会保存在某一个分区中，而不会在多个分区中被保存多份。官网上的这张图非常清晰地展示了：
 
-![](http://www.louisvv.com/wp-content/uploads/2019/12/20191228112029_11745.png)
+![](https://image.easyblog.top/20191228112029_11745.png)
 
 **可是，为什么Kafka要做这样的设计？为什么使用分区而不是直接使用多个Topic呢？**
 
@@ -54,7 +54,7 @@ Kafka的默认分区策略，是按顺序进行分配的。
 
 比如一个主题下有3个分区，那么第一条消息被发送到分区0，第二条被发送到分区1，第三条被发送到分区2，以此类推。当生产第4条消息时又会重新开始，即将其分配到分区0，如下图所示：
 
-<img src="https://upload-images.jianshu.io/upload_images/5850202-3ae926f10b7bc1da.png?imageMogr2/auto-orient/strip|imageView2/2/w/943" style="zoom:67%;" />
+<img src="https://image.easyblog.top/5850202-3ae926f10b7bc1da.png" style="zoom:67%;" />
 
 ✅ 优点：可以提供**非常优秀的负载均衡能力**，可以保证消息被平均分配到所有分区上。
 
@@ -66,7 +66,7 @@ Kafka的默认分区策略，是按顺序进行分配的。
 
 顾名思义，这种策略会随意地将消息放置到任意一个分区上，如下图所示：
 
-<img src="https://upload-images.jianshu.io/upload_images/5850202-4c3c5bc4408dc312.png?imageMogr2/auto-orient/strip|imageView2/2/w/943" style="zoom:67%;" />
+<img src="https://image.easyblog.top/5850202-4c3c5bc4408dc312.png" style="zoom:67%;" />
 
 ✅ 优点：消息的分区选择逻辑简单。
 

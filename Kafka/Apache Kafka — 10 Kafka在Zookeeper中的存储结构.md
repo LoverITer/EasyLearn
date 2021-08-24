@@ -8,7 +8,7 @@ Kafka集群依赖于Zookeeper，了解Kafka在Zookeeper中的一些存储结构�
 
 ### 一、Kafka在ZooKeeper中保存了哪些信息？
 
-![](https://img-blog.csdn.net/20140923175837147?watermark/2/text/aHR0cDovL2Jsb2cuY3Nkbi5uZXQvbGl6aGl0YW8=/font/5a6L5L2T/fontsize/400/fill/I0JBQkFCMA==/dissolve/70/gravity/SouthEast)
+![](https://image.easyblog.top/20140923175837147)
 
 #### 1.1 Consumer注册信息
 
@@ -33,7 +33,7 @@ Kafka集群依赖于Zookeeper，了解Kafka在Zookeeper中的一些存储结构�
 
 
 
-<img src="img/watermark,type_ZmFuZ3poZW5naGVpdGk,shadow_10,text_aHR0cHM6Ly9ibG9nLmNzZG4ubmV0L3FxXzQwMzc4MDM0,size_16,color_FFFFFF,t_70.png" style="zoom:80%;" />
+<img src="https://image.easyblog.top/watermark,type_ZmFuZ3poZW5naGVpdGk,shadow_10,text_aHR0cHM6Ly9ibG9nLmNzZG4ubmV0L3FxXzQwMzc4MDM0,size_16,color_FFFFFF,t_70.png" style="zoom:80%;" />
 
 
 
@@ -51,13 +51,13 @@ Kafka集群依赖于Zookeeper，了解Kafka在Zookeeper中的一些存储结构�
 
  前面说过，为了保障数据的可靠性，每个 Topic 的 Partitions 实际上是存在备份的，并且备份的数量由 Kafka 机制中的 replicas 来控制。那么问题来了：如下图所示，假设某个 TopicA 被分为 2 个 Partitions，并且存在两个备份，由于这 2 个 Partitions（1-2）被分布在不同的 broker 上，同一个 partiton 与其备份不能（也不应该）存储于同一个 broker 上。以 Partition1 为例，假设它被存储于 broker2，其对应的备份分别存储于 broker1 和 broker4，有了备份，可靠性得到保障，但数据一致性却是个问题。
 
-<img src="https://images.gitbook.cn/7161bf30-cb00-11e8-bcac-99cd81fed45b" alt="enter image description here" style="zoom:80%;" />
+<img src="https://image.easyblog.top/7161bf30-cb00-11e8-bcac-99cd81fed45b" alt="enter image description here" style="zoom:80%;" />
 
 为了保障数据的一致性，ZooKeeper 得以引入。基于 ZooKeeper 的选举机制，Kafka 为每一个 partition 找一个节点作为 leader，其余备份作为 follower。
 
 如下图所示，就 ` TopicA  partition1 ` 而言，如果位于 broker2（Kafka 节点）上的 partition1 为 leader，那么位于 broker1 和 broker4 上面的 partition1 就充当 follower。
 
-<img src="https://images.gitbook.cn/780e1ef0-cb00-11e8-9b13-63a667cc1a24" alt="enter image description here" style="zoom:80%;" />
+<img src="https://image.easyblog.top/780e1ef0-cb00-11e8-9b13-63a667cc1a24" alt="enter image description here" style="zoom:80%;" />
 
 基于上图的架构，当 producer push 的消息写入 partition 时，作为 leader 的 broker（Kafka 节点） 会将消息写入自己的分区，同时还会将此消息复制到各个 follower 实现同步。如果某个follower 挂掉，leader 会再找一个替代并同步消息；但是，如果 leader 挂了，follower 们会选举出一个新的 leader 替代，继续业务，这些都是由 ZooKeeper 完成的。
 

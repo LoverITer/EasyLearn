@@ -78,7 +78,7 @@ Kafka里数据有副本，那么必然会出现leader和follower不一致的情�
 - **LEO**：Log end offset，即每个副本中的最后一个offset。
 - **HW**：High Watermark，所有副本中最小的LEO。
 
-<img src="https://img-blog.csdnimg.cn/20210206195237305.png?x-oss-process=image/watermark,type_ZmFuZ3poZW5naGVpdGk,shadow_10,text_aHR0cHM6Ly9ibG9nLmNzZG4ubmV0L0NhcnNvbl9DaHU=,size_16,color_FFFFFF,t_70" style="zoom:60%;" />
+<img src="https://image.easyblog.top/20210206195237305.png" style="zoom:60%;" />
 
 * **follower故障**：follower 发生故障后会被临时踢出 ISR，待该 follower 恢复后， follower 会读取本地磁盘记录的上次的 HW，并将 log 文件高于 HW 的部分截取掉，从 HW 开始向 leader 进行同步。等该 follower 的 LEO 大于等于该 Partition 的 HW，即 follower 追上 leader 之后，就可以重新加入 ISR 了。
 

@@ -20,17 +20,17 @@ Spring提供了两种事物管理实现方式：
 
 全路径名是：`org.springframework.transaction.support.TransactionTemplate`。看包名也知道了，这是Spring对事务的模板类。在Spring中模版模式使用非常广泛的～
 
-![](img/%E6%88%AA%E5%B1%8F2021-08-04%20%E4%B8%8B%E5%8D%885.56.19.png)
+![](https://image.easyblog.top/%E6%88%AA%E5%B1%8F2021-08-04%20%E4%B8%8B%E5%8D%885.56.19.png)
 
 点进TransactionTemplate源码它是实现了`TransactionOperations、InitializingBean`这2个接口（熟悉Spring源码的小伙伴知道这个InitializingBean又是老套路），我们来看下接口源码如下：
 
 **TransactionOperations接口**
 
-![截屏2021-08-04 下午6.53.09](img/%E6%88%AA%E5%B1%8F2021-08-04%20%E4%B8%8B%E5%8D%886.53.09.png)
+![](https://image.easyblog.top/%E6%88%AA%E5%B1%8F2021-08-04%20%E4%B8%8B%E5%8D%886.53.09.png)
 
 **InitializingBean**
 
-![](img/%E6%88%AA%E5%B1%8F2021-08-04%20%E4%B8%8B%E5%8D%886.51.09.png)
+![](https://image.easyblog.top/%E6%88%AA%E5%B1%8F2021-08-04%20%E4%B8%8B%E5%8D%886.51.09.png)
 
 TransactionOperations这个接口用来执行事务的回调方法，InitializingBean这个是典型的Spring Bean初始化流程中的预留接口，专用用来在bean属性加载完毕时执行的方法（不熟悉的小伙伴去看看Spring Bean生命周期的流程）。
 
@@ -38,11 +38,11 @@ TransactionOperations这个接口用来执行事务的回调方法，Initializin
 
 看到这里，有的小伙伴自然而然就有疑问了：TransactionTemplate的2个接口的方法做了什么？接着往下说！
 
-![](img/%E6%88%AA%E5%B1%8F2021-08-04%20%E4%B8%8B%E5%8D%886.55.56.png)
+![](https://image.easyblog.top/%E6%88%AA%E5%B1%8F2021-08-04%20%E4%B8%8B%E5%8D%886.55.56.png)
 
 如上图所示，实际上afterPropertiesSet方法只是校验了事务管理器不为空，execute()才是核心方法，execute主要步骤：
 
-<img src="img/%E6%88%AA%E5%B1%8F2021-08-04%20%E4%B8%8B%E5%8D%887.17.14.png" style="zoom:45%;" />
+<img src="https://image.easyblog.top/%E6%88%AA%E5%B1%8F2021-08-04%20%E4%B8%8B%E5%8D%887.17.14.png" style="zoom:45%;" />
 
 总结一下，核心步骤如下：
 

@@ -10,7 +10,7 @@
 
 
 
-<img src="http://www.louisvv.com/wp-content/uploads/2019/12/20191228112029_11745.png" style="zoom:150%;" />
+<img src="https://image.easyblog.top/20191228112029_11745.png" style="zoom:150%;" />
 
 我们都知道，影响磁盘的关键因素是磁盘服务时间，即磁盘完成一个I/O请求所花费的时间，它由寻道时间、旋转延迟和数据传输时间三部分构成。而**机械硬盘的连续读写性能很好，但随机读写性能很差**，这主要是因为磁头移动到正确的磁道上需要时间，随机读写时，磁头需要不停的移动，时间都浪费在了磁头寻址上，所以性能不高。衡量磁盘的重要主要指标是IOPS和吞吐量。
 
@@ -50,7 +50,7 @@ Kafka 中存在大量的网络数据持久化到磁盘（Producer 到 Broker）�
 
 同时，还伴随着四次上下文切换，如下图所示：
 
-<img src="img/960sgasah7.png" style="zoom:75%;" />
+<img src="https://image.easyblog.top/960sgasah7.png" style="zoom:75%;" />
 
 数据落盘通常都是非实时的，kafka 生产者数据持久化也是如此。Kafka 的数据**并不是实时的写入硬盘**，它充分利用了现代操作系统分页存储来利用内存提高 I/O 效率。
 
@@ -58,7 +58,7 @@ Kafka 中存在大量的网络数据持久化到磁盘（Producer 到 Broker）�
 
 在此特殊场景下，接收来自 socket buffer 的网络数据，应用进程不需要中间处理、直接进行持久化时。可以使用 mmap 内存文件映射。此过程如下图所示：
 
-<img src="img/s9xo1tjp4d.png" alt="s9xo1tjp4d" style="zoom:75%;" />
+<img src="https://image.easyblog.top/s9xo1tjp4d.png" alt="s9xo1tjp4d" style="zoom:75%;" />
 
 但是，`mmap` 也有一个很明显的缺陷——不可靠，写到 `mmap` 中的数据并没有被真正的写到硬盘，操作系统会在程序主动调用 flush 的时候才把数据真正的写到硬盘。为此，Kafka 提供了一个参数——`producer.type` 来控制是不是主动将数据flush到磁盘；如果 Kafka 写入到 mmap 之后就立即 flush 然后再返回 Producer 叫同步(sync)；写入 mmap 之后立即返回 Producer 不调用 flush 就叫异步(async)，默认是 sync。
 
@@ -83,7 +83,7 @@ buffer = File.read Socket.send(buffer)
 
 Linux 2.4版本开始， 内核增加了 `sendfile()` 系统调用，提供了零拷贝。数据通过 DMA 拷贝到内核态 Buffer 后，直接通过 DMA 拷贝到 NIC Buffer，无需 CPU 拷贝。这也是零拷贝这一说法的来源。除了减少数据拷贝外，因为整个读文件 - 网络发送由一个 `sendfile()`  调用完成，整个过程只有两次上下文切换，因此大大提高了性能。
 
-<img src="img/jwsgj6ky88.png" style="zoom:70%;" />
+<img src="https://image.easyblog.top/jwsgj6ky88.png" style="zoom:70%;" />
 
 Kafka通过零拷贝技术只用将磁盘文件中的数据复制到页面缓存中一份，然后将数据直接从页面缓存直接发送到网络中（发送给不同的订阅者时，都可以使用同一个页面缓存），避免了重复复制操作。
 
