@@ -177,7 +177,7 @@ Maven需要配置两项东西，一个是 `settings.xml` 文件的路径
 
 ![](https://image.easyblog.top/QQ%E6%88%AA%E5%9B%BE20210822165457.png)
 
-往下拉，拉到页面最下边另一个需要配置的是一下Maven_HOME的路径
+往下拉，拉到页面最下边另一个需要配置的是 Maven_HOME 的路径
 
 ![](https://image.easyblog.top/QQ%E6%88%AA%E5%9B%BE20210822165538.png)
 
@@ -191,9 +191,11 @@ JDK配置一下别名 以及 JAVA_HOME 的路径就可以了
 
 **Git 配置**
 
-Git不用过多配置，一般只有配置一下别名就好了
+Git也不用过多配置，一般只有配置一下别名就好了
 
 ![](https://image.easyblog.top/QQ%E6%88%AA%E5%9B%BE20210822165522.png)
+
+
 
 ## 三、使用Jenkins进行Java代码(单元)测试、打包。
 
