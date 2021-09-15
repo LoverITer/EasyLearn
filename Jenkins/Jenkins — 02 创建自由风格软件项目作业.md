@@ -2,7 +2,7 @@
 
 
 
-接[上一节](./Jenkins — 01 Jenkins快速入门) 教程继续，本文以我托管在gitee上的一个开源项目[spring-boot-rest-framework](https://bitbucket.org/yangjunming/spring-boot-rest-framework)做为演示，讲解如何创建自动化部署。
+接[上一节](./Jenkins — 01 Jenkins快速入门) 教程继续，本文以我托管在gitee上的一个开源项目**[spring-boot-ci-test](https://gitee.com/LoveITer/spring-boot-ci-test)**做为演示，讲解如何创建自动化部署。
 
 
 
