@@ -156,7 +156,7 @@ public class StreamTest {
 
 这个方法应该是用的最多的，也是最重要的一个方法。
 
-`Stream<T> filter(Predicate<? super T> predicate);`是filter这个接口的定义，filter方法接收一个`Predicate`类型参数用于对目标集合进行过滤，Predicate是一个函数式接口，是Java8内置的四大基础函数式接口之一。Predicate接口的定义如下图所示。
+`Stream<T> filter(Predicate<? super T> predicate)` 是其方法定义，filter方法接收一个`Predicate`类型参数用于对目标集合进行过滤，Predicate是一个函数式接口，是Java8内置的四大基础函数式接口之一。Predicate接口的定义如下图所示。
 
 ![](https://image.easyblog.top/%E6%88%AA%E5%B1%8F2021-07-19%20%E4%B8%8B%E5%8D%883.21.16-6765863.png)
 
@@ -254,15 +254,15 @@ public static void main(String[] args) {
  } 
 ```
 
-sorted排序方法还是和上面一样只是对管道中的流进行了操作，原集合是没有变化的，因此这里排序，可以继续用`thenComparing`对排序后的stream再进行排序操作，可以发现确实简洁方便。
+sorted排序方法还是和上面一样只是对管道中的流进行了操作，原集合是没有变化的，因此这里排序，可以继续用`thenComparing`对排序后的stream再进行排序操作，可以发现代码确实简洁不少。
 
 #### 5.3 map元素映射
 
-这个方法比较简单，一般是用于根据对象中某些属性的生成新的集合，
+这个方法比较简单，一般是用于根据对象中某些属性的生成新的集合，它的参数是一个 Function 对象，类似数学中的函数 f(x)=y，输入x，经过函数处理就会输出我们想要的y，这里的 Function 也是一样的含义。
 
 **Demo3**
 
-比如：现在有一个Student列表，包含了学号，学生姓名以及学生各科成绩，现在需要需要一个只包含学生学号以及其各科成绩的新列表StudentScore。
+比如：现在有一个Student列表，包含了学号，学生姓名以及学生各科成绩，现在需要需要一个只包含学生学号以及其各科成绩的新列表StudentScoreBean。
 
 ```java
  public static void main(String[] args) {     
@@ -277,11 +277,11 @@ sorted排序方法还是和上面一样只是对管道中的流进行了操作�
      }};                                                                                                                                                    
                                                                                                                                                             
      //对Student进行处理获得StudentScore列表                                                                                                                                                      
-     List<StudentScore> collect = students.stream().map(student -> {                                                                                        
+     List<StudentScoreBean> lists = students.stream().map(student -> {                                                                                        
          return new StudentScore(student.getStuId(), student.getMathScore(), student.getEnglishScore(), student.getChineseScore());                         
      }).collect(Collectors.toList());                                                                                                                       
                                                                                                                                                      
-     collect.forEach(studentScore ->{                                                                                                                       
+     lists.forEach(studentScore ->{                                                                                                                       
          System.out.println(studentScore.getStuId()+" "+studentScore.getMathScore()+" "+studentScore.getEnglishScore()+" "+studentScore.getChineseScore()); 
      });                                                                                                                                                    
  }                                                                                                                                                          
@@ -366,7 +366,7 @@ public static void main(String[] args) {
 
 #### 6.2 collect生成集合
 
-这个方法可能也是开发中用到最多的方法了吧，同样是一个很重要的方法。它会将一个Stream转换成目标集合。`<R, A> R collect(Collector<? super T, A, R> collector);`  入参是一个`Collector`对象，一把会使用Collector提供的几个静态方法：`Collecot.toList()`、`Collector.toSet()`  以及 `Collector.toMap()`。最总返回值会根据传入的参数类型生成不同类型的集合。
+这个方法可能也是开发中用到最多的方法了吧，同样是一个很重要的方法。它会将一个Stream转换成目标集合。`<R, A> R collect(Collector<? super T, A, R> collector);`  入参是一个`Collector`对象，一般会使用Collector提供的几个静态方法：`Collecot.toList()`、`Collector.toSet()`  以及 `Collector.toMap()`。最总返回值会根据传入的参数类型生成不同类型的集合。
 
 下面是一个示例。
 
@@ -410,8 +410,6 @@ public class StreamTest {
     }
 }
 ```
-
-
 
 
 
