@@ -8,7 +8,7 @@
 
  通过持续集成， 团队可以快速的从一个功能到另一个功能，简而言之，敏捷软件开发很大一部分都要归功于持续集成。持续集成强调开发人员提交了新代码之后，立刻进行构建、（单元）测试。根据测试结果，我们可以确定新代码和原有代码能否正确地集成在一起。可以借助下图对CI加以理解。
 
-<img src="https://upload-images.jianshu.io/upload_images/6464255-1b6e3bfdbece1492.jpg?imageMogr2/auto-orient/strip|imageView2/2/w/1000" alt="img" style="zoom:70%;" />
+<img src="https://image.easyblog.top/6464255-1b6e3bfdbece1492.jpg" alt="img" style="zoom:70%;" />
 
 根据持续集成的设计，代码从提交到生产，整个过程有以下几步。 
 
@@ -36,7 +36,7 @@
 
 **CD**（Continuous Delivery， 中文意思**持续交付**）是在持续集成的基础上，将集成后的代码部署到更贴近真实运行环境(类生产环境)中。比如，我们完成单元测试后，可以把代码部署到连接数据库的Staging环境中更多的测试。如果代码没有问题，可以继续手动部署到生产环境。如下图所示反应的是CI/CD 的大概工作模式。
 
-<img src="https://upload-images.jianshu.io/upload_images/6464255-ba088ec7257062c0.jpg?imageMogr2/auto-orient/strip|imageView2/2/w/1000" alt="img" style="zoom:60%;" />
+<img src="https://image.easyblog.top/6464255-ba088ec7257062c0.jpg" alt="img" style="zoom:60%;" />
 
 
 
@@ -139,7 +139,7 @@ systemctl start jenkins
 
 
 
-<center><img src="img/%E6%88%AA%E5%B1%8F2021-08-25%20%E4%B8%8A%E5%8D%8810.08.17.png" alt="启动成功的Jenkins" style="zoom:90%;" /><br/>启动成功的Jenkins</center>
+<center><img src="https://image.easyblog.top/%E6%88%AA%E5%B1%8F2021-08-25%20%E4%B8%8A%E5%8D%8810.08.17.png" alt="启动成功的Jenkins" style="zoom:90%;" /><br/>启动成功的Jenkins</center>
 
 
 
@@ -149,7 +149,7 @@ systemctl start jenkins
 
 默认情况下jenkins会在8080端口启动，我的服务ip地址是47.99.161.205 ，因此我们在浏览器地址栏输入：http://47.99.161.205:8080 访问启动的Jenkins，首次使用会看到如下初始化界面：
 
-![](img/%E6%88%AA%E5%B1%8F2021-08-25%20%E4%B8%8A%E5%8D%8810.11.13.png)
+![](https://image.easyblog.top/%E6%88%AA%E5%B1%8F2021-08-25%20%E4%B8%8A%E5%8D%8810.11.13.png)
 
 根据页面提示，我们需要执行命令：`cat /var/lib/jenkins/secrets/initialAdminPassword` 查看管理员密码，将此密码复制到输入框解锁 Jenkins 。
 
@@ -157,11 +157,11 @@ systemctl start jenkins
 
 之后跳转到安装插件页面，选择默认的选项让jenkins安装插件，这个过程如果网络好的话非常的快。如果网络不好进场卡住，可暂时先跳过该步骤。
 
-![](img/%E6%88%AA%E5%B1%8F2021-08-25%20%E4%B8%8A%E5%8D%8810.14.19.png)
+![](https://image.easyblog.top/%E6%88%AA%E5%B1%8F2021-08-25%20%E4%B8%8A%E5%8D%8810.14.19.png)
 
 如下图所示是Jenkins正在安装推荐的插件的页面截图，这个过程正常情况下会持续3~5分钟左右。
 
-![](img/%E6%88%AA%E5%B1%8F2021-08-25%20%E4%B8%8A%E5%8D%8810.15.33.png)
+![](https://image.easyblog.top/%E6%88%AA%E5%B1%8F2021-08-25%20%E4%B8%8A%E5%8D%8810.15.33.png)
 
 
 
@@ -169,7 +169,7 @@ systemctl start jenkins
 
 插件安装完成之后会再次跳转到另一个页面，Jenkins会要求我们创建一个管理员用户，这一步可以直接点击下面的 `使用admin账户继续` 跳过这一步。
 
-![](img/%E6%88%AA%E5%B1%8F2021-08-25%20%E4%B8%8A%E5%8D%8810.18.06.png)
+![](https://image.easyblog.top/%E6%88%AA%E5%B1%8F2021-08-25%20%E4%B8%8A%E5%8D%8810.18.06.png)
 
 
 
@@ -177,7 +177,7 @@ systemctl start jenkins
 
 实例配置一般保持默认值就好了，配置项的含义在Jenkins页面下面灰色字体也有解释。截止这里，是Jenkins首次启动需要初始化配置的信息，点击按钮 `保存并完成` Jenkins初始化工作就完成了。
 
-![](img/%E6%88%AA%E5%B1%8F2021-08-25%20%E4%B8%8A%E5%8D%8810.21.30.png)
+![](https://image.easyblog.top/%E6%88%AA%E5%B1%8F2021-08-25%20%E4%B8%8A%E5%8D%8810.21.30.png)
 
 
 
@@ -205,7 +205,7 @@ Maven需要配置两项东西，一个是 `settings.xml` 文件的路径
 
 如果项目使用是gradle，那么也可以配置一下gradle：
 
-![](img/27612-20160118223316093-2139077993.png)
+![](https://image.easyblog.top/27612-20160118223316093-2139077993.png)
 
 **JDK 配置**
 
@@ -231,7 +231,7 @@ Git也不用过多配置，一般只用配置一下别名就好了
 
 如果部署过程中，还需要运行shell脚本，以及通过scp向远程机器上传文件，则需要配置下面这些：
 
-![](img/27612-20160118223348140-1485606417.png)
+![](https://image.easyblog.top/27612-20160118223348140-1485606417.png)
 
 注意 ⚠️  上图中红色标1的地方，填写的是本机的ssh私钥证书，红色标2的地方为证书的访问密码，如果未设置证书密码，直接留空，Root Repository Path为远程服务器的上传根目录，hostname即为远程服务器的机器名称（或IP）.
 
@@ -239,7 +239,7 @@ Git也不用过多配置，一般只用配置一下别名就好了
 
 此外，还有一个强大的publish over ssh，不仅能向远程服务器上传文件，还能远程执行服务器上的Shell脚本，可参考下面配置：
 
-![](img/27612-20160118223403484-785001627.png)
+![](https://image.easyblog.top/27612-20160118223403484-785001627.png)
 
 
 

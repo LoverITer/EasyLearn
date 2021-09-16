@@ -66,8 +66,6 @@ Kafka集群依赖于Zookeeper，了解Kafka在Zookeeper中的一些存储结构�
 
 
 
-
-
 #### 1.5 Controller Epoch
 
-我考虑这个应该是需要改的，我这边已经提前改好测好了
+
