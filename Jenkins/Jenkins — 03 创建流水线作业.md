@@ -214,7 +214,7 @@ pipeline {
 
 ### 2.2 通过直接脚本配置并执行流水线作业
 
-要使用直接脚本执行流水线，请首先从 GitHub 复制该 [Jenkinsfile 示例](https://gitee.com/LoveITer/CICDPractice)的内容。选择 “Pipeline script” 作为 “Destination”，然后将该 Jenkinsfile 的内容粘贴到 “Script” 中。
+要使用直接脚本执行流水线，请首先复制下来我在gitee上托管的 [Jenkinsfile 示例](https://gitee.com/LoveITer/CICDPractice)的内容。选择 “Pipeline script” 作为 “Destination”，然后将该 Jenkinsfile 的内容粘贴到 “Script” 中。
 
 注意 ⚠️  共有三个阶段：Build、Test 和 Deploy，它们是任意的，可以是任何一个。每个阶段中都有一些步骤；在此示例中，它们只是打印一些随机消息。
 

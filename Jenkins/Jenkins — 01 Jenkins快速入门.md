@@ -44,7 +44,7 @@
 
 ## 二、Jenkins 介绍
 
-![img](https://image.easyblog.top/u=4181632889,1695848186&fm=26&fmt=auto&gp=0.jpg)
+![img](../../../u=4181632889,1695848186&fm=26&fmt=auto&gp=0.png)
 
 Jenkins是一个开源的、界面操作友好的持续集成(CI)工具，起源于Hudson（Hudson是商用的），**主要用于持续、自动的构建/测试软件项目、监控外部任务的运行**。**Jenkins用Java语言编写，可在Tomcat等流行的servlet容器中运行，也可独立运行**。通常与常见的的版本控制工具SVN、GIT以及构建工具Maven、Ant、Gradle结合使用。官网： http://jenkins-ci.org/。
 
@@ -67,7 +67,7 @@ Jenkins是一个开源的、界面操作友好的持续集成(CI)工具，起源
 
 首先前往Jenkins官网下载稳定版本的package，地址：https://www.jenkins.io/download/
 
-![](https://image.easyblog.top/QQ%E6%88%AA%E5%9B%BE20210824230025.png)
+![](img/QQ%E6%88%AA%E5%9B%BE20210824230025.png)
 
 #### （1）使用yum安装Jenkins
 
@@ -147,7 +147,7 @@ systemctl start jenkins
 
 #### 3.2.1 获取Jenkins解锁密码
 
-之后默认情况下jenkins会在8080端口启动，我的服务ip地址是47.99.161.205 ，因此我们在浏览器地址栏输入：http://47.99.161.205:8080 访问启动的Jenkins，首次使用会看到如下初始化界面：
+默认情况下jenkins会在8080端口启动，我的服务ip地址是47.99.161.205 ，因此我们在浏览器地址栏输入：http://47.99.161.205:8080 访问启动的Jenkins，首次使用会看到如下初始化界面：
 
 ![](https://image.easyblog.top/%E6%88%AA%E5%B1%8F2021-08-25%20%E4%B8%8A%E5%8D%8810.11.13.png)
 
@@ -244,3 +244,4 @@ Git也不用过多配置，一般只用配置一下别名就好了
 
 
 和SCP的参数设置类似，不过这个插件多出了一个Test Configuration的按钮，如果参数正确，点击该按钮后，会尝试连接到远程服务器，成功的话，会显示Success.
+
