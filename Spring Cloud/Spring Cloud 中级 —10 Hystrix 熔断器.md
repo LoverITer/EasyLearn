@@ -1,4 +1,4 @@
-## Spring Cloud 中级 — Hystrix 服务降级与服务熔断
+## Spring Cloud 中级 — Hystrix 熔断器
 
 
 
@@ -323,7 +323,7 @@ public class PaymentClientFallBack implements PaymentClient {
 
 
 
-## 5、Hystrix工作流程
+## 五、Hystrix工作流程
 
 
 
@@ -369,7 +369,7 @@ public class PaymentClientFallBack implements PaymentClient {
 
 
 
-## 6、Hystrix图形化服务监控
+## 六、Hystrix图形化服务监控
 
 **（1）新建图形化Hystrix图形化监控服务模块**
 
