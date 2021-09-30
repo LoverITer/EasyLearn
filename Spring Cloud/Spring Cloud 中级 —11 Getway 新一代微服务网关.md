@@ -212,9 +212,12 @@ spring:
       port: 8500
       discovery:
         service-name: ${spring.application.name}
-        instance-id: cloud-getway  #设置实例id，默认是项目的名称
+        instance-id: cloud-getway-service  #设置实例id，默认是项目的名称
         prefer-ip-address: true   #显示客户端的ip地址
     gateway:
+      discovery:
+         locator: 
+             enbale: true  #开启从注册中心动态创建路由的功能，利用微服务名进行路由
       routes:
         - id: payment-route            #路由的ID，没有固定规则但要求唯一，建议配合服务名
           uri: lb://consul-provider-payment  #配置规则： lb://微服务名称
@@ -231,3 +234,514 @@ spring:
 
 ## 三、路由匹配规则
 
+Spring Cloud Gateway 的功能很强大，我们仅仅通过 Predicates 的设计就可以看出来，前面我们只是使用了 predicates 进行了简单的条件匹配，其实 Spring Cloud Gataway 帮我们内置了很多 Predicates 功能。
+
+Spring Cloud Gateway 是通过 Spring WebFlux 的 HandlerMapping 做为底层支持来匹配到转发路由，Spring Cloud Gateway 内置了很多 Predicates 工厂，这些 Predicates 工厂通过不同的 HTTP 请求参数来匹配，多个 Predicates 工厂可以组合使用。
+
+![](https://img-blog.csdnimg.cn/20200527213652534.png?x-oss-process=image/watermark,type_ZmFuZ3poZW5naGVpdGk,shadow_10,text_aHR0cHM6Ly9ibG9nLmNzZG4ubmV0L3FxXzM5NzIyNDc1,size_16,color_FFFFFF,t_70)
+
+gateWay的主要功能之一是转发请求，转发规则的定义主要包含三个部分：
+
+| 转发规则定义            | 描述                                                         |
+| ----------------------- | ------------------------------------------------------------ |
+| Route（路由）           | 路由是网关的基本单元，由ID、URI、一组Predicate、一组Filter组成，根据Predicate进行匹配转发。 |
+| Predicate（谓语、断言） | 路由转发的判断条件，目前SpringCloud Gateway支持多种方式，常见如：Path、Query、Method、Header等，写法必须遵循 key=vlue的形式 |
+| Filter（过滤器）        | 过滤器是路由转发请求时所经过的过滤逻辑，可用于修改请求、响应内容 |
+
+### 3.1 断言条件/转发规则（Predicate）
+
+Predicate 来源于 Java 8，是 Java 8 中引入的一个函数，Predicate 接受一个输入参数，返回一个布尔值结果。该接口包含多种默认方法来将 Predicate 组合成其他复杂的逻辑（比如：与，或，非）。可以用于接口请求参数校验、判断新老数据是否有变化需要进行更新操作。
+
+在 Spring Cloud Gateway 中 Spring 利用 Predicate 的特性实现了各种路由匹配规则，有通过 Header、请求参数等不同的条件来进行作为条件匹配到对应的路由。网上有一张图总结了 Spring Cloud 内置的几种 Predicate 的实现。
+
+![](https://upload-images.jianshu.io/upload_images/19816137-bb046dbf19bee1b4.gif?imageMogr2/auto-orient/strip)
+
+上面这些转发实现类分别对应以下转发规则（predicates），假设转发uri都设定为***[http://localhost:8001](http://localhost:9023/)***
+
+| 规则    | 实例                                                         | 说明                                                         |
+| :------ | :----------------------------------------------------------- | :----------------------------------------------------------- |
+| Path    | - Path=/gate/**,/rule/**                                     | 当请求的路径为gate、rule开头的时，转发到http://localhost:8001服务器上 |
+| Before  | - Before=2017-01-20T17:42:47.789-07:00[America/Denver]       | 在某个时间之前的请求才会被转发到 http://localhost:8001服务器上 |
+| After   | - After=2017-01-20T17:42:47.789-07:00[America/Denver]        | 在某个时间之后的请求才会被转发                               |
+| Between | - Between=2017-01-20T17:42:47.789-07:00[America/Denver],2017-01-21T17:42:47.789-07:00[America/Denver] | 在某个时间段之间的才会被转发                                 |
+| Cookie  | - Cookie=chocolate, ch.p                                     | 名为chocolate的表单或者满足正则ch.p的表单才会被匹配到进行请求转发 |
+| Header  | - Header=X-Request-Id, \d+                                   | 携带参数X-Request-Id或者满足\d+的请求头才会匹配              |
+| Host    | - Host=www.hd123.com                                         | 当主机名为www.hd123.com的时候直接转发到http://localhost:8001服务器上 |
+| Method  | - Method=GET                                                 | 只有GET方法才会匹配转发请求，还可以限定POST、PUT等请求方式   |
+
+
+
+
+
+### 3.2 过滤器规则（Filter）
+
+![、](C:\Users\Administrator\AppData\Roaming\Typora\typora-user-images\image-20210930233414321.png)
+
+| 过滤规则            | 实例                           | 说明                                                         |
+| :------------------ | :----------------------------- | :----------------------------------------------------------- |
+| PrefixPath          | - PrefixPath=/app              | 在请求路径前加上app                                          |
+| RewritePath         | - RewritePath=/test, /app/test | 访问localhost:9022/test,请求会转发到localhost:8001/app/test  |
+| SetPath             | SetPath=/app/{path}            | 通过模板设置路径，转发的规则时会在路径前增加app，{path}表示原请求路径 |
+| RedirectTo          |                                | 重定向                                                       |
+| RemoveRequestHeader |                                | 去掉某个请求头信息                                           |
+
+注：当配置多个filter时，优先定义的会被调用，剩余的filter将不会生效
+
+#### PrefixPath   对所有的请求路径添加前缀
+
+```yml
+spring:
+  cloud:
+    gateway:
+      routes:
+      - id: prefixpath_route
+        uri: https://example.org
+        filters:
+        - PrefixPath=/mypath
+```
+
+访问/hello的请求被发送到https://example.org/mypath/hello。
+
+#### RedirectTo  重定向
+
+重定向，配置包含重定向的返回码和地址
+
+```yml
+spring:
+  cloud:
+    gateway:
+      routes:
+      - id: prefixpath_route
+        uri: https://example.org
+        filters:
+        - RedirectTo=302, https://acme.org
+```
+
+#### RemoveRequestHeader   去掉请求头信息
+
+```yml
+spring:
+  cloud:
+    gateway:
+      routes:
+      - id: removerequestheader_route
+        uri: https://example.org
+        filters:
+        - RemoveRequestHeader=X-Request-Foo
+```
+
+去掉请求头信息 X-Request-Foo
+
+#### RemoveResponseHeader   去掉响应头信息
+
+```yml
+spring:
+  cloud:
+    gateway:
+      routes:
+      - id: removerequestheader_route
+        uri: https://example.org
+        filters:
+        - RemoveResponseHeader=X-Request-Foo
+```
+
+#### RemoveRequestParameter   去掉请求参数信息
+
+```yml
+spring:
+  cloud:
+    gateway:
+      routes:
+      - id: removerequestparameter_route
+        uri: https://example.org
+        filters:
+        - RemoveRequestParameter=red
+```
+
+#### RewritePath   改写路径
+
+```yml
+spring:
+  cloud:
+    gateway:
+      routes:
+      - id: rewrite_filter
+        uri: http://localhost:8081
+        predicates:
+        - Path=/test/**
+        filters:
+        - RewritePath=/where(?<segment>/?.*), /test(?<segment>/?.*) 
+```
+
+将/where/... 改成 test/...
+
+#### SetPath   设置请求路径
+
+功能基本的和 RewritePath类似
+
+```yml
+spring:
+  cloud:
+    gateway:
+      routes:
+      - id: setpath_route
+        uri: https://example.org
+        predicates:
+        - Path=/red/{segment}
+        filters:
+        - SetPath=/{segment}
+```
+
+#### SetRequestHeader   设置请求头信息
+
+```yml
+spring:
+  cloud:
+    gateway:
+      routes:
+      - id: setrequestheader_route
+        uri: https://example.org
+        filters:
+        - SetRequestHeader=X-Request-Red, Blue
+```
+
+#### SetStatus  设置响应状态码
+
+```yml
+spring:
+  cloud:
+    gateway:
+      routes:
+      - id: setstatusint_route
+        uri: https://example.org
+        filters:
+        - SetStatus=401
+```
+
+#### StripPrefix   跳过指定路径
+
+```yml
+spring:
+  cloud:
+    gateway:
+      routes:
+      - id: nameRoot
+        uri: https://nameservice
+        predicates:
+        - Path=/name/**
+        filters:
+        - StripPrefix=2
+```
+
+#### RequestSize  请求大小
+
+```yml
+spring:
+  cloud:
+    gateway:
+      routes:
+      - id: request_size_route
+        uri: http://localhost:8080/upload
+        predicates:
+        - Path=/upload
+        filters:
+        - name: RequestSize
+          args:
+            maxSize: 5000000
+```
+
+超过5M的请求会返回413错误。
+
+#### Default-filters  对所有请求添加全局过滤器
+
+```yml
+spring:
+  cloud:
+    gateway:
+      default-filters:
+      - AddResponseHeader=X-Response-Default-Red, Default-Blue
+      - PrefixPath=/httpbin
+```
+
+
+
+### 3.3 通过代码的方式配置
+
+通过代码进行配置，将路由规则设置为一个Bean即可：
+
+```java
+	@Bean
+	public RouteLocator customRouteLocator(RouteLocatorBuilder builder) {
+		return builder.routes()
+			.route("path_route", r -> r.path("/get")
+				.uri("http://httpbin.org"))
+			.route("host_route", r -> r.host("*.myhost.org")
+				.uri("http://httpbin.org"))
+			.route("rewrite_route", r -> r.host("*.rewrite.org")
+				.filters(f -> f.rewritePath("/foo/(?<segment>.*)", "/${segment}"))
+				.uri("http://httpbin.org"))
+			.route("hystrix_route", r -> r.host("*.hystrix.org")
+				.filters(f -> f.hystrix(c -> c.setName("slowcmd")))
+				.uri("http://httpbin.org"))
+			.route("hystrix_fallback_route", r -> r.host("*.hystrixfallback.org")
+				.filters(f -> f.hystrix(c -> c.setName("slowcmd").setFallbackUri("forward:/hystrixfallback")))
+				.uri("http://httpbin.org"))
+			.route("limit_route", r -> r
+				.host("*.limited.org").and().path("/anything/**")
+				.filters(f -> f.requestRateLimiter(c -> c.setRateLimiter(redisRateLimiter())))
+				.uri("http://httpbin.org"))
+			.build();
+	}
+```
+
+
+
+## 四、Gatway 网关过滤器自定义开发
+
+### 4.1 过滤器的执行次序
+
+Spring-Cloud-Gateway 基于过滤器实现，同 zuul 类似，有**pre**和**post**两种方式的 filter,分别处理**前置逻辑**和**后置逻辑**。客户端的请求先经过**pre**类型的 filter，然后将请求转发到具体的业务服务，收到业务服务的响应之后，再经过**post**类型的 filter 处理，最后返回响应到客户端。
+
+过滤器执行流程如下，**order 越大，优先级越低**。
+
+<img src="https://image.easyblog.top/spring-cloud-gateway-fliter-order.png" style="zoom:40%;" />
+
+分为全局过滤器和局部过滤器
+
+- **全局过滤器：**对所有路由生效
+
+- **局部过滤器：**对指定路由生效
+
+
+
+### 4.2 自定义全局过滤器
+
+实现 GlobalFilter 接口和 Ordered 接口，重写相关方法，注册到到Spring容器管理即可，无需配置，全局过滤器对所有的路由都有效。
+
+全局过滤器示例代码如下：
+
+```java
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.cloud.gateway.filter.GatewayFilterChain;
+import org.springframework.cloud.gateway.filter.GlobalFilter;
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Configuration;
+import org.springframework.core.Ordered;
+import org.springframework.core.annotation.Order;
+import org.springframework.web.server.ServerWebExchange;
+import reactor.core.publisher.Mono;
+
+@Configuration
+public class FilterConfig
+{
+
+    @Bean
+    @Order(-1)
+    public GlobalFilter a()
+    {
+        return new AFilter();
+    }
+
+    @Bean
+    @Order(0)
+    public GlobalFilter b()
+    {
+        return new BFilter();
+    }
+
+    @Bean
+    @Order(1)
+    public GlobalFilter c()
+    {
+        return new CFilter();
+    }
+
+
+    @Slf4j
+    public class AFilter implements GlobalFilter, Ordered
+    {
+
+        @Override
+        public Mono<Void> filter(ServerWebExchange exchange, GatewayFilterChain chain)
+        {
+            log.info("AFilter前置逻辑");
+            return chain.filter(exchange).then(Mono.fromRunnable(() ->
+            {
+                log.info("AFilter后置逻辑");
+            }));
+        }
+
+        //   值越小，优先级越高
+//    int HIGHEST_PRECEDENCE = -2147483648;
+//    int LOWEST_PRECEDENCE = 2147483647;
+        @Override
+        public int getOrder()
+        {
+            return HIGHEST_PRECEDENCE + 100;
+        }
+    }
+
+    @Slf4j
+    public class BFilter implements GlobalFilter, Ordered
+    {
+        @Override
+        public Mono<Void> filter(ServerWebExchange exchange, GatewayFilterChain chain)
+        {
+            log.info("BFilter前置逻辑");
+            return chain.filter(exchange).then(Mono.fromRunnable(() ->
+            {
+                log.info("BFilter后置逻辑");
+            }));
+        }
+
+
+        //   值越小，优先级越高
+//    int HIGHEST_PRECEDENCE = -2147483648;
+//    int LOWEST_PRECEDENCE = 2147483647;
+        @Override
+        public int getOrder()
+        {
+            return HIGHEST_PRECEDENCE + 200;
+        }
+    }
+
+    @Slf4j
+    public class CFilter implements GlobalFilter, Ordered
+    {
+
+        @Override
+        public Mono<Void> filter(ServerWebExchange exchange, GatewayFilterChain chain)
+        {
+            log.info("CFilter前置逻辑");
+            return chain.filter(exchange).then(Mono.fromRunnable(() ->
+            {
+                log.info("CFilter后置逻辑");
+            }));
+        }
+
+        //   值越小，优先级越高
+//    int HIGHEST_PRECEDENCE = -2147483648;
+//    int LOWEST_PRECEDENCE = 2147483647;
+        @Override
+        public int getOrder()
+        {
+            return HIGHEST_PRECEDENCE + 300;
+        }
+    }
+}
+```
+
+
+
+### 4.3 自定义局部过滤器
+
+步骤：
+
+1 需要实现GatewayFilter, Ordered，实现相关的方法
+
+2 加入到过滤器工厂，并且注册到spring容器中。
+
+3、在配置文件中进行配置，如果不配置则不启用此过滤器规则。
+
+局部过滤器举例, 对请求头部的 user-id 进行校验，代码如下：
+
+#### （1）需要实现GatewayFilter, Ordered 接口，实现相关的方法
+
+```java
+import lombok.extern.slf4j.Slf4j;
+import org.apache.commons.lang3.StringUtils;
+import org.springframework.cloud.gateway.filter.GatewayFilter;
+import org.springframework.cloud.gateway.filter.GatewayFilterChain;
+import org.springframework.cloud.gateway.filter.GlobalFilter;
+import org.springframework.core.Ordered;
+import org.springframework.http.HttpStatus;
+import org.springframework.stereotype.Component;
+import org.springframework.web.server.ServerWebExchange;
+import reactor.core.publisher.Mono;
+
+//@Component
+@Slf4j
+public class UserIdCheckGateWayFilter implements GatewayFilter, Ordered
+{
+    @Override
+    public Mono<Void> filter(ServerWebExchange exchange, GatewayFilterChain chain)
+    {
+        String url = exchange.getRequest().getPath().pathWithinApplication().value();
+        log.info("请求URL:" + url);
+        log.info("method:" + exchange.getRequest().getMethod());
+       /*   String secret = exchange.getRequest().getHeaders().getFirst("secret");
+        if (StringUtils.isBlank(secret))
+        {
+            return chain.filter(exchange);
+        }*/
+         //获取param 请求参数
+        String uname = exchange.getRequest().getQueryParams().getFirst("uname");
+        //获取header
+        String userId = exchange.getRequest().getHeaders().getFirst("user-id");
+        log.info("userId：" + userId);
+
+        if (StringUtils.isBlank(userId))
+        {
+            log.info("*****头部验证不通过，请在头部输入  user-id");
+            //终止请求，直接回应
+            exchange.getResponse().setStatusCode(HttpStatus.NOT_ACCEPTABLE);
+            return exchange.getResponse().setComplete();
+        }
+        return chain.filter(exchange);
+    }
+
+    //   值越小，优先级越高
+    //    int HIGHEST_PRECEDENCE = -2147483648;
+    //    int LOWEST_PRECEDENCE = 2147483647;
+    @Override
+    public int getOrder()
+    {
+        return HIGHEST_PRECEDENCE;
+    }
+}
+```
+
+#### （2）加入到过滤器工厂，并且注册到spring容器中
+
+```java
+import com.crazymaker.cloud.nacos.demo.gateway.filter.UserIdCheckGateWayFilter;
+import org.springframework.cloud.gateway.filter.GatewayFilter;
+import org.springframework.cloud.gateway.filter.factory.AbstractGatewayFilterFactory;
+import org.springframework.stereotype.Component;
+
+@Component
+public class UserIdCheckGatewayFilterFactory extends AbstractGatewayFilterFactory<Object>
+{
+    @Override
+    public GatewayFilter apply(Object config)
+    {
+        return new UserIdCheckGateWayFilter();
+    }
+}
+```
+
+#### （3）在配置文件中进行配置
+
+在配置文件中配置一下自定义的过滤器，如果不配置则不会启用此过滤器规则
+
+```yml
+spring:
+  cloud: 
+     gateway:
+       rotues:
+          - id: service_provider_demo_route_filter
+          uri: lb://service-provider-demo
+          predicates:
+            - Path=/filter/**
+          filters:
+            - RewritePath=/filter/(?<segment>.*), /provider/$\{segment}
+            - UserIdCheck
+```
+
+
+
+
+
+## 参考资料
+
+* https://www.cnblogs.com/crazymakercircle/p/11704077.html
