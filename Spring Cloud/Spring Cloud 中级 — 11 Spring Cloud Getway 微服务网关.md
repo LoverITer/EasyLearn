@@ -1,10 +1,10 @@
-## Spring Cloud 中级 — Spring Cloud Getway 新一代微服务网关
+## Spring Cloud 中级 — Spring Cloud Getway 微服务网关
 
 
 
 ## 一、Spring Cloud Getway简介
 
-### 1.1 Spring Cloud Getway的定义
+### 1.1 Spring Cloud Getway 是什么？
 
 ![](https://image.easyblog.top/image-20210925175419850.png)
 
@@ -275,17 +275,7 @@ Predicate 来源于 Java 8，是 Java 8 中引入的一个函数，Predicate 接
 
 ### 3.2 过滤器规则（Filter）
 
-![、](C:\Users\Administrator\AppData\Roaming\Typora\typora-user-images\image-20210930233414321.png)
-
-| 过滤规则            | 实例                           | 说明                                                         |
-| :------------------ | :----------------------------- | :----------------------------------------------------------- |
-| PrefixPath          | - PrefixPath=/app              | 在请求路径前加上app                                          |
-| RewritePath         | - RewritePath=/test, /app/test | 访问localhost:9022/test,请求会转发到localhost:8001/app/test  |
-| SetPath             | SetPath=/app/{path}            | 通过模板设置路径，转发的规则时会在路径前增加app，{path}表示原请求路径 |
-| RedirectTo          |                                | 重定向                                                       |
-| RemoveRequestHeader |                                | 去掉某个请求头信息                                           |
-
-注：当配置多个filter时，优先定义的会被调用，剩余的filter将不会生效
+![](https://image.easyblog.top/image-20210930233414321.png)注：当配置多个filter时，优先定义的会被调用，剩余的filter将不会生效
 
 #### PrefixPath   对所有的请求路径添加前缀
 
@@ -502,11 +492,11 @@ spring:
 
 Spring-Cloud-Gateway 基于过滤器实现，同 zuul 类似，有**pre**和**post**两种方式的 filter,分别处理**前置逻辑**和**后置逻辑**。客户端的请求先经过**pre**类型的 filter，然后将请求转发到具体的业务服务，收到业务服务的响应之后，再经过**post**类型的 filter 处理，最后返回响应到客户端。
 
-过滤器执行流程如下，**order 越大，优先级越低**。
+过滤器执行流程如下图所示，**order 越大，优先级越低**。
 
 <img src="https://image.easyblog.top/spring-cloud-gateway-fliter-order.png" style="zoom:40%;" />
 
-分为全局过滤器和局部过滤器
+Filter同时又分为全局过滤器和局部过滤器
 
 - **全局过滤器：**对所有路由生效
 
@@ -516,7 +506,7 @@ Spring-Cloud-Gateway 基于过滤器实现，同 zuul 类似，有**pre**和**po
 
 ### 4.2 自定义全局过滤器
 
-实现 GlobalFilter 接口和 Ordered 接口，重写相关方法，注册到到Spring容器管理即可，无需配置，全局过滤器对所有的路由都有效。
+实现 `GlobalFilter` 接口和 `Ordered` 接口，重写相关方法，注册到到Spring容器管理即可，无需配置，全局过滤器对所有的路由都有效。
 
 全局过滤器示例代码如下：
 
@@ -532,61 +522,57 @@ import org.springframework.web.server.ServerWebExchange;
 import reactor.core.publisher.Mono;
 
 @Configuration
-public class FilterConfig
-{
+public class FilterConfig{
 
     @Bean
     @Order(-1)
-    public GlobalFilter a()
-    {
-        return new AFilter();
+    public GlobalFilter a(){
+        return new GlobalUserFilter();
     }
 
     @Bean
     @Order(0)
-    public GlobalFilter b()
-    {
+    public GlobalFilter b(){
         return new BFilter();
     }
 
     @Bean
     @Order(1)
-    public GlobalFilter c()
-    {
+    public GlobalFilter c(){
         return new CFilter();
     }
 
 
     @Slf4j
-    public class AFilter implements GlobalFilter, Ordered
-    {
+    public class GlobalUserFilter implements GlobalFilter, Ordered {
 
         @Override
-        public Mono<Void> filter(ServerWebExchange exchange, GatewayFilterChain chain)
-        {
-            log.info("AFilter前置逻辑");
-            return chain.filter(exchange).then(Mono.fromRunnable(() ->
-            {
+        public Mono<Void> filter(ServerWebExchange exchange, GatewayFilterChain chain) {
+            log.info("执行 GlobalUserFilter 前置逻辑.....");
+            String uname = exchange.getRequest().getQueryParams().getFirst("username");
+            if (StringUtils.isEmpty(uname)) {
+               log.info("*****用户名为Null 非法用户,(┬＿┬)");
+               exchange.getResponse().setStatusCode(HttpStatus.NOT_ACCEPTABLE);//给人家一个回应
+               return exchange.getResponse().setComplete();
+            }
+            return chain.filter(exchange).then(Mono.fromRunnable(() ->{
                 log.info("AFilter后置逻辑");
             }));
         }
 
         //   值越小，优先级越高
-//    int HIGHEST_PRECEDENCE = -2147483648;
-//    int LOWEST_PRECEDENCE = 2147483647;
+        //    int HIGHEST_PRECEDENCE = -2147483648;
+        //    int LOWEST_PRECEDENCE = 2147483647;
         @Override
-        public int getOrder()
-        {
+        public int getOrder(){
             return HIGHEST_PRECEDENCE + 100;
         }
     }
 
     @Slf4j
-    public class BFilter implements GlobalFilter, Ordered
-    {
+    public class BFilter implements GlobalFilter, Ordered {
         @Override
-        public Mono<Void> filter(ServerWebExchange exchange, GatewayFilterChain chain)
-        {
+        public Mono<Void> filter(ServerWebExchange exchange, GatewayFilterChain chain) {
             log.info("BFilter前置逻辑");
             return chain.filter(exchange).then(Mono.fromRunnable(() ->
             {
@@ -596,35 +582,30 @@ public class FilterConfig
 
 
         //   值越小，优先级越高
-//    int HIGHEST_PRECEDENCE = -2147483648;
-//    int LOWEST_PRECEDENCE = 2147483647;
+        //    int HIGHEST_PRECEDENCE = -2147483648;
+        //    int LOWEST_PRECEDENCE = 2147483647;
         @Override
-        public int getOrder()
-        {
+        public int getOrder() {
             return HIGHEST_PRECEDENCE + 200;
         }
     }
 
     @Slf4j
-    public class CFilter implements GlobalFilter, Ordered
-    {
+    public class CFilter implements GlobalFilter, Ordered {
 
         @Override
-        public Mono<Void> filter(ServerWebExchange exchange, GatewayFilterChain chain)
-        {
+        public Mono<Void> filter(ServerWebExchange exchange, GatewayFilterChain chain) {
             log.info("CFilter前置逻辑");
-            return chain.filter(exchange).then(Mono.fromRunnable(() ->
-            {
+            return chain.filter(exchange).then(Mono.fromRunnable(() -> {
                 log.info("CFilter后置逻辑");
             }));
         }
 
         //   值越小，优先级越高
-//    int HIGHEST_PRECEDENCE = -2147483648;
-//    int LOWEST_PRECEDENCE = 2147483647;
+        //   int HIGHEST_PRECEDENCE = -2147483648;
+        //   int LOWEST_PRECEDENCE = 2147483647;
         @Override
-        public int getOrder()
-        {
+        public int getOrder() {
             return HIGHEST_PRECEDENCE + 300;
         }
     }
@@ -659,29 +640,20 @@ import org.springframework.stereotype.Component;
 import org.springframework.web.server.ServerWebExchange;
 import reactor.core.publisher.Mono;
 
-//@Component
 @Slf4j
-public class UserIdCheckGateWayFilter implements GatewayFilter, Ordered
-{
+public class UserIdCheckGateWayFilter implements GatewayFilter, Ordered {
     @Override
-    public Mono<Void> filter(ServerWebExchange exchange, GatewayFilterChain chain)
-    {
+    public Mono<Void> filter(ServerWebExchange exchange, GatewayFilterChain chain) {
         String url = exchange.getRequest().getPath().pathWithinApplication().value();
         log.info("请求URL:" + url);
         log.info("method:" + exchange.getRequest().getMethod());
-       /*   String secret = exchange.getRequest().getHeaders().getFirst("secret");
-        if (StringUtils.isBlank(secret))
-        {
-            return chain.filter(exchange);
-        }*/
          //获取param 请求参数
         String uname = exchange.getRequest().getQueryParams().getFirst("uname");
         //获取header
         String userId = exchange.getRequest().getHeaders().getFirst("user-id");
         log.info("userId：" + userId);
 
-        if (StringUtils.isBlank(userId))
-        {
+        if (StringUtils.isBlank(userId)) {
             log.info("*****头部验证不通过，请在头部输入  user-id");
             //终止请求，直接回应
             exchange.getResponse().setStatusCode(HttpStatus.NOT_ACCEPTABLE);
@@ -694,8 +666,7 @@ public class UserIdCheckGateWayFilter implements GatewayFilter, Ordered
     //    int HIGHEST_PRECEDENCE = -2147483648;
     //    int LOWEST_PRECEDENCE = 2147483647;
     @Override
-    public int getOrder()
-    {
+    public int getOrder() {
         return HIGHEST_PRECEDENCE;
     }
 }
@@ -710,11 +681,9 @@ import org.springframework.cloud.gateway.filter.factory.AbstractGatewayFilterFac
 import org.springframework.stereotype.Component;
 
 @Component
-public class UserIdCheckGatewayFilterFactory extends AbstractGatewayFilterFactory<Object>
-{
+public class UserIdCheckGatewayFilterFactory extends AbstractGatewayFilterFactory<Object> {
     @Override
-    public GatewayFilter apply(Object config)
-    {
+    public GatewayFilter apply(Object config) {
         return new UserIdCheckGateWayFilter();
     }
 }
