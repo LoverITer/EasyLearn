@@ -71,7 +71,7 @@ import org.springframework.cloud.openfeign.EnableFeignClients;
 
 
 @SpringBootApplication
-@EnableFeignClients  //开启Feign
+@EnableFeignClients  //开启Feign，会自动扫描标记有@FeignClient注解的接口成为组件
 public class FeignOrderApplication {
 
     public static void main(String[] args) {
@@ -81,9 +81,10 @@ public class FeignOrderApplication {
 }
 ```
 
-#### 2.4 提供Feign客户端
+#### 2.4 编写Feign客户端
 
-提供一个接口，并在接口使用 `FeignClient` 注解，name或value属性中指定要调用的服务注册在注册中心的名称，然后提供接口，这里可以像编写Spring MVC 控制器一样使用各种Mapping注解以及参数类注解。
+Feign 客户端一般是一个接口，因此我们需要提供一个接口，并在接口定义上使用 `@FeignClient` 注解，然后在接口中可以像编写Spring MVC 控制器（Controller）一样使用各种Mapping注解以及参数类注解来调用目标方法。
+
 
 ```java
 import org.springframework.cloud.openfeign.FeignClient;
@@ -99,6 +100,16 @@ public interface PaymentClient {
 
 }
 ```
+
+上面的代码中使用到了 `@FeignClient` 注解的 `name` 属性。除此之外，`@FeignClient` 注解的常用属性如下：
+                                             
+* `name`：指定FeignClient的名称，如果项目使用了Ribbon，name属性会作为微服务的名称，用于服务发现
+* `url`: url一般用于调试，可以手动指定@FeignClient调用的地址
+* `decode404`:当发生http 404错误时，如果该字段位true，会调用decoder进行解码，否则抛出FeignException
+* `configuration`: Feign配置类，可以自定义Feign的Encoder、Decoder、LogLevel、Contract
+* `fallback`: 定义容错的处理类，当调用远程接口失败或超时时，会调用对应接口的容错逻辑，fallback指定的类必须实现@FeignClient标记的接口，通常配合服务熔断（Hystrix）进行使用
+* `fallbackFactory`: 工厂类，用于生成fallback类示例，通过这个属性我们可以实现每个接口通用的容错逻辑，减少重复的代码
+* `path`: 定义当前FeignClient的统一前缀
 
 #### 2.5 提供Controller用于测试
 
