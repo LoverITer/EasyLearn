@@ -32,7 +32,7 @@ OPenFegin 项目 GitHub地址：https://github.com/spring-cloud/spring-cloud-ope
 
 ## 二、使用OpenFeign调用微服务接口
 
-### 2.1 引入OpenFeign的POM依赖
+#### 2.1 在服务Consumer 项目的 `pom.xml` 中引入OpenFeign的依赖
 
 ```xml
 <dependency>                                               
@@ -41,7 +41,7 @@ OPenFegin 项目 GitHub地址：https://github.com/spring-cloud/spring-cloud-ope
 </dependency>                                              
 ```
 
-### 2.2 application.yml
+#### 2.2 在服务Consumer 项目的 `application.yml` 中做如下配置
 
 ```yml
 server:
@@ -58,11 +58,11 @@ spring:
         discovery:
           service-name: ${spring.application.name}
 
-client:
+url:
   payment: consul-provider-payment   #配置服务名称
 ```
 
-### 2.3 启动类加注@EnableFeignClients开启Feign
+#### 2.3 启动类加注@EnableFeignClients开启Feign
 
 ```java
 import org.springframework.boot.SpringApplication;
@@ -81,7 +81,7 @@ public class FeignOrderApplication {
 }
 ```
 
-### 2.4 提供Feign客户端
+#### 2.4 提供Feign客户端
 
 提供一个接口，并在接口使用 `FeignClient` 注解，name或value属性中指定要调用的服务注册在注册中心的名称，然后提供接口，这里可以像编写Spring MVC 控制器一样使用各种Mapping注解以及参数类注解。
 
@@ -90,7 +90,7 @@ import org.springframework.cloud.openfeign.FeignClient;
 import org.springframework.web.bind.annotation.GetMapping;
 
 
-@FeignClient(name = "${client.payment}")
+@FeignClient(name = "${url.payment}")
 public interface PaymentClient {
 
     //这里直接写调用目标服务的接口路径
@@ -100,7 +100,7 @@ public interface PaymentClient {
 }
 ```
 
-### 2.5 提供Controller调用Feign Client
+#### 2.5 提供Controller用于测试
 
 这里业务比较简单，直接在controller
 
@@ -124,15 +124,13 @@ public class PaymentOrderController {
 }
 ```
 
-### 2.6 测试
-
-首先在本地8500端口启动consul，之后在本地8006~8009启动4个provider，最后在本地80端口启动上面编写的消费者，在浏览器访问：http://127.0.0.1/consumer/payment ，执行结果如下GIF动图所示：
+完成之后，首先在本地8500端口启动consul，之后在本地8006~8009启动4个provider，最后在本地80端口启动上面编写的消费者，在浏览器访问：http://127.0.0.1/consumer/payment ，执行结果如下GIF动图所示：
 
 ![](https://image.easyblog.top/2.gif)
 
 
 
-### 2.7 总结
+#### 2.6 总结
 
 <img src="https://image.easyblog.top/QQ%E6%88%AA%E5%9B%BE20210919120219.png" style="width:70%;" />
 
