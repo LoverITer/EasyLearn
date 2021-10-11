@@ -438,11 +438,9 @@ DNS域名解析过程如下：
 
 ### 13、cookie和session的关系和区别
 
-http请求是无状态的,即每次服务端接收到客户端的请求时，都是一个全新的请求，服务器并不知道客户端的历史请求记录。比如当用户从客户端请求一次登录后，登录成功，再次进行请求时，因为tomcat不能识别这两次会话都是来自同一个浏览器，即服务端不知道客户端的历史请求记录；就会再次弹出登录对话框。
+http请求是无状态的,即每次服务端接收到客户端的请求时，都是一个全新的请求，服务器并不知道客户端的历史请求记录。比如当用户从客户端请求一次登录后，登录成功，再次进行请求时，因为tomcat不能识别这两次会话都是来自同一个浏览器，即服务端不知道客户端的历史请求记录；就会再次弹出登录对话框。为了解决这个问题，就出现了**会话跟踪技术，在服务端就是session，在客户端就是cookie**
 
-为了解决这个问题，就出现了**会话跟踪技术，在服务端就是session，在客户端就是cookie**
-
-##### （1）ookie是什么
+##### （1）cookie是什么
 
 一个HTTP cookie的（网络Cookie，浏览器cookie）是一小片数据的一个服务器发送到用户的网络浏览器。浏览器可以存储它并将其与下一个请求一起发送回同一服务器。通常，它用于判断两个请求是否来自同一个浏览器 - 例如，保持用户登录。它记住[无状态](https://developer.mozilla.org/en-US/docs/Web/HTTP/Overview#HTTP_is_stateless_but_not_sessionless) HTTP协议的有状态信息。
 
@@ -454,11 +452,11 @@ session的目的：弥补HTTP无状态特性，服务器可以利用session存�
 
 ##### （3）session的实现机制
 
-**（3.1）服务器如何判断客户端发送过来的请求属于同一个会话？**
+​	**（3.1）服务器如何判断客户端发送过来的请求属于同一个会话？**
 
 用sessionId区分；sessionId 相同即认为是同一个会话；在tomcat中session id中用JSESSIONID来表示；
 
-**（3.2）服务器、客户端如何获取sessionID?SessionID在期间是如何传输的？**
+​	**（3.2）服务器、客户端如何获取sessionID?SessionID在期间是如何传输的？**
 
 服务器第一次接收到请求时，开辟了一块Session空间（创建了Session对象），同时生成一个Session id，并通过响应头的Set-Cookie：“JSESSIONID=XXXXXXX”命令，向客户端发送要求设置cookie的响应； 客户端收到响应后，在本机客户端设置了一个JSESSIONID=XXXXXXX的cookie信息，该cookie的过期时间为浏览器会话结束；
 
@@ -468,7 +466,7 @@ session的目的：弥补HTTP无状态特性，服务器可以利用session存�
 
 
 
-##### （4）ookie和Session的区别
+##### （4）cookie和Session的区别
 
 （1）**数据存储位置**不同：cookie数据存放在**客户的浏览器**上，session数据放在**服务器**上。
 
@@ -644,7 +642,7 @@ Cache-Control 可以由多个字段组合而成，主要有以下几个取值：
 
 <img src="https://images2018.cnblogs.com/blog/940884/201804/940884-20180423141951735-912699213.png" alt="img" style="zoom:67%;" />
 
-## 操系系统
+## 第二章 操系系统
 
 ##### 1、进程间通信的方式
 
@@ -1055,7 +1053,7 @@ ET模式在很大程度上减少了epoll事件被重复触发的次数，因此�
 
 
 
-#### MySQL(数据库)
+## 第三章 MySQL(数据库)
 
 ##### 1、讲一下数据库范式
 
@@ -1698,7 +1696,7 @@ mysql中有一种机制是表锁定和行锁定，是为了保证数据的完整
 
 水平分片从理论上突破了单机数据量处理的瓶颈，并且扩展相对自由，是分库分表的标准解决方案。
 
-#### Redis
+## 第四章 Redis
 
 ##### 1、Redis有哪些常见的数据结构？底层都是如何实现的？
 
@@ -2566,7 +2564,7 @@ A线程执行完步骤2不再休眠Ms，而是往消息总线esb发送一个消�
 该方案主要只需要担心一个问题：如果第二步淘汰缓存失败，则数据会不一致
 解决办法之前也提到过，用“重试机制”就可以，如果淘汰缓存失败就报错，然后重试直到成功
 
-#### Java基础
+## 第五章 Java基础
 
 ##### 1、Java有几种数据类型，分别是什么？String是基本数据类型吗？
 
@@ -3218,7 +3216,11 @@ wait方法就是使当前线程等待该对象的锁，当前线程必须是该�
 
 为了确保数据一致性，因为内部类访问局部变量时，是拷贝局部变量的值，而不是引用。添加final关键字后这个引用变量的地址值不会发生变化，所以这个引用变量就不会再指向其他对象了（一直会复制这个对象的值，数据一致性就有保证了）。
 
-#### Java集合
+
+
+
+
+## 第六章 Java集合
 
 ##### 1、List、Set、Map三者的区别？
 
@@ -3624,7 +3626,11 @@ CopyOnWriteArrayList允许并发的读，就是因为他没有加任何锁，任
 
 
 
-#### Java并发
+
+
+
+
+## 第七章 Java并发
 
 ##### 1、什么是进程?什么是线程？
 
@@ -4728,7 +4734,13 @@ synchronized的原理是，一个线程lock之后，必须unlock后，其他线�
 - 如果一个变量没有被lock，就不能对其进行unlock操作。也不能unlock一个被其他线程锁住的变量。
 - 一个线程对一个变量进行unlock操作之前，必须先把此变量同步回主内存。
 
-#### JVM
+
+
+
+
+
+
+## 第八章 JVM
 
 #####  一、ClassLoader类加载器
 
@@ -5685,7 +5697,333 @@ CPU100%，那肯定是有线程一直在占用着系统资源，所以具体方�
 
 
 
-####  智力题
+
+
+
+
+
+
+
+
+##  第九章 Spring
+
+### 1、说一下spring中Bean的作用域
+
+**singleton：**
+
+  Spring IoC容器中只会存在一个共享的Bean实例，无论有多少个Bean引用它，始终指向同一对象。Singleton作用域是Spring中的缺省作用域。
+
+**prototype：**
+
+  每次通过Spring容器获取prototype定义的bean时，容器都将创建一个新的Bean实例，每个Bean实例都有自己的属性和状态，而singleton全局只有一个对象。
+
+**request：**
+
+  在一次Http请求中，容器会返回该Bean的同一实例。而对不同的Http请求则会产生新的Bean，而且该bean仅在当前Http Request内有效。
+
+**session：**
+
+  在一次Http Session中，容器会返回该Bean的同一实例。而对不同的Session请求则会创建新的实例，该bean实例仅在当前Session内有效。
+
+**global Session：**
+
+  在一个全局的Http Session中，容器会返回该Bean的同一个实例，仅在使用portlet context时有效。
+
+### 2、说一下spring中Bean的生命周期
+
+<img src="https://img-blog.csdnimg.cn/20201028180446251.png?x-oss-process=image/watermark,type_ZmFuZ3poZW5naGVpdGk,shadow_10,text_aHR0cHM6Ly9ibG9nLmNzZG4ubmV0L3dlaXhpbl80MzI0NDY5OA==,size_16,color_FFFFFF,t_70#pic_center" style="width:69%;" />
+
+- 实例化一个Bean，也就是我们通常说的new。
+- 按照Spring上下文对实例化的Bean进行配置，也就是IOC注入。
+- 如果这个Bean实现了BeanNameAware接口，会调用它实现的setBeanName(String beanId)方法，此处传递的是Spring配置文件中Bean的ID。
+- 如果这个Bean实现了BeanFactoryAware接口，会调用它实现的setBeanFactory()，传递的是Spring工厂本身（可以用这个方法获取到其他Bean）。
+- 如果这个Bean实现了ApplicationContextAware接口，会调用setApplicationContext(ApplicationContext)方法，传入Spring上下文。
+- 如果这个Bean关联了BeanPostProcessor接口，将会调用postProcessBeforeInitialization(Object obj, String s)方法，BeanPostProcessor经常被用作是Bean内容的更改，并且由于这个是在Bean初始化结束时调用After方法，也可用于内存或缓存技术。
+- 如果这个Bean在Spring配置文件中配置了init-method属性会自动调用其配置的初始化方法。
+- 如果这个Bean关联了BeanPostProcessor接口，将会调用postAfterInitialization(Object obj, String s)方法。
+- 当Bean不再需要时，会经过清理阶段，如果Bean实现了DisposableBean接口，会调用其实现的destroy方法。
+- 最后，如果这个Bean的Spring配置中配置了destroy-method属性，会自动调用其配置的销毁方法。
+
+### 3、**对Spring中依赖注入（DI）三种方式的认识**
+
+**三种注入方式为：构造方法注入、setter方法注入和使用字段(Filed)注入（用注解方式）**
+
+1. 设值注入与传统的JavaBean的写法更相似，程序员更容易理解、接受，通过setter方式设定依赖关系显得更加直观、明显;
+2. 对于复杂的依赖关系，如果采用构造注入，会导致构造器过于臃肿，难以阅读。Spring在创建Bean实例时，需要同时实例化其依赖的全部实例，因而会产生浪费。而使用设置注入，则避免这下问题;
+3. 在某些属性可选的情况下，多参数的构造器更加笨拙，官方更鼓励使用设值注入。
+4. 构造注入可以在构造器中决定依赖关系的注入顺序，优先依赖的优先注入。
+5. 对于依赖关系无须变化的Bean，构造注入更有用处，因为没有setter方法，所有的依赖关系全部在构造器内设定，因此，不用担心后续代码对依赖关系的破坏。
+6. 构造注入使依赖关系只能在构造器中设定，则只有组件的创建者才能改变组件的依赖关系。对组件的调用者而言，组件内部的依赖关系完全透明，更符合高内聚的原则。
+7. 设值注入不会重写构造方法的值。如果我们对同一个变量同时使用了构造方法注入又使用了设置方法注入的话，那么构造方法将不能覆盖由设值方法注入的值。
+8. 建议采用以设值注入为主，构造注入为辅的注入策略。对于依赖关系无须变化的注入，尽量采用构造注入;而其他的依赖关系的注入，则考虑采用set注入。
+
+### **4、Spring框架中都用到了哪些设计模式？**
+
+- 代理模式：在AOP和remoting中被用的比较多。
+- 单例模式：在spring配置文件中定义的bean默认为单例模式。
+- 模板方法模式：用来解决代码重复的问题。
+- 前端控制器模式：Spring提供了DispatcherServlet来对请求进行分发。
+- 依赖注入模式：贯穿于BeanFactory / ApplicationContext接口的核心理念。
+- 工厂模式：BeanFactory用来创建对象的实例。
+
+### **5、BeanFactory 和ApplicationContext的区别**
+
+BeanFactory 粗暴简单，可以理解为就是个 HashMap，Key 是 BeanName，Value 是 Bean 实例。通常只提供注册（put），获取（get）这两个功能。我们可以称之为 “低级容器”。
+
+ApplicationContext 可以称之为 “高级容器”。因为他比 BeanFactory 多了更多的功能。他继承了多个接口。因此具备了更多的功能（例如资源的获取，支持多种消息（例如 JSP tag 的支持），对 BeanFactory 多了工具级别的支持等待。所以你看他的名字，已经不是 BeanFactory 之类的工厂了，而是 “应用上下文”， 代表着整个大容器的所有功能。）。该接口定义了一个 refresh 方法，此方法是所有阅读 Spring 源码的人的最熟悉的方法，用于刷新整个容器，即重新加载/刷新所有的 bean。
+
+### 6、Spring IOC
+
+控制反转（`Inversion of Control`，简称`IoC`），是面向对象编程中的一种设计原则，可以用来降低代码之间的耦合度。其中最常见的方式叫做依赖注入（`Dependency Injection`，简称`DI`），还有一种方式叫“依赖查找”（`Dependency Lookup`）。通过控制反转，对象在被创建的时候，由一个调控系统内所有对象的外界实体，将其所依赖的对象的引用传递(注入)给它。
+
+谁控制谁，控制什么：
+
+- 在之前，没有IOC时，我们直接在对象内部通过new进行创建对象，是程序主动去创建依赖对象；
+- 而现在，是由IOC专门一个容器来创建这些对象，即由Ioc容器来控制对 象的创建；
+- `谁控制谁？`当然是IOC容器控制了对象；`控制什么？`那就是主要控制了外部资源获取（不只是对象还包括比如文件等）。
+
+所谓反转：
+
+- 所谓的反转，其实是反转的控制权，由 `Spring` 来控制对象的生命周期，那么对象的控制就完全脱离了我们的控制，控制权交给了`Spring`。这个反转是指：我们由对象的控制者变成了`IOC` 的被动控制者。
+
+**IOC的两种实现：依赖查找（DL）和依赖注入（DI）**。
+
+IOC 和 DI 、DL 的关系：
+
+<img src="https://www.javazhiyin.com/wp-content/uploads/2020/12/java5-1609402546.png" style="zoom:70%;" />
+
+- DI（`Dependency Injection`） 是 Spring 使用的方式，容器负责组件的装配。是 `IOC` 的具体实现。程序把依赖交给容器，容器帮你管理依赖。
+- DL（`Dependency Lookup`）已经被抛弃。
+
+**IOC容器的原理**
+
+IOC容器其实就是一个大工厂，它用来管理我们所有的对象以及依赖关系。原理就是通过Java的反射技术来实现的！通过反射我们可以获取类的所有信息(成员变量、类名等等等)！再通过配置文件(xml)或者注解来描述类与类之间的关系。我们就可以通过这些配置信息和反射技术来构建出对应的对象和依赖关系了！
+
+我们简单来看看实际Spring IOC容器是怎么实现对象的创建和依赖的：
+
+<img src="https://www.javazhiyin.com/wp-content/uploads/2020/12/java6-1609402546.jpeg"  style="zoom:67%;" />
+
+1. 根据Bean配置信息[在容器内部创建Bean](http://mp.weixin.qq.com/s?__biz=MzU2MTI4MjI0MQ==&mid=2247496582&idx=1&sn=d0253316d1b3efe8f66ab44dd4774817&chksm=fc799e28cb0e173e59a33aba80c96830fbff7260bea8d252504077bda776d7b8ba64a0eea4be&scene=21#wechat_redirect)定义注册表
+2. 根据注册表加载、实例化bean、建立Bean与Bean之间的依赖关系
+3. 将这些准备就绪的Bean放到Map缓存池中，等待应用程序调用
+
+**IOC容器体系**
+
+Spring容器(Bean工厂)可简单分成两种：BeanFactory（"低级容器"）和ApplicationContext（”高级容器“），ApplicationContext是BeanFactory的子类。为了更直观的展示 “低级容器” 和 “高级容器” 的关系，我这里通过常用的 ClassPathXmlApplicationContext 类，来展示整个容器的层级 UML 关系。
+
+<img src="https://image.easyblog.top/%E5%BE%AE%E4%BF%A1%E5%9B%BE%E7%89%87_20210125141655.jpg" style="zoom:67%;" />
+
+最上面的 BeanFactory 知道吧？我就不讲了。
+
+下面的 3 个绿色的，都是功能扩展接口，这里就不展开讲。
+
+看下面的隶属 ApplicationContext 粉红色的 “高级容器”，依赖着 “低级容器”，这里说的是依赖，不是继承哦。他依赖着 “低级容器” 的 getBean 功能。而高级容器有更多的功能：支持不同的信息源头，可以访问文件资源，支持应用事件（Observer 模式）。
+
+通常用户看到的就是 “高级容器”。 但 BeanFactory 也非常够用啦！
+
+左边灰色区域的是 “低级容器”， 只负载加载 Bean，获取 Bean。容器其他的高级功能是没有的。例如上图画的 refresh 刷新 Bean 工厂所有配置。生命周期事件回调等。
+
+**IOC容器初始化过程**
+
+> 解释了低级容器和高级容器，我们可以看看一个 IoC 启动过程是什么样子的。说白了，就是 ClassPathXmlApplicationContext 这个类，在启动时，都做了啥。（由于我这是 interface21 的代码，肯定和你的 Spring 4.x 系列不同）。
+
+下图是 ClassPathXmlApplicationContext 的构造过程，实际就是 Spring IoC 的初始化过程。
+
+<img src="https://image.easyblog.top/spring%20IOC%20%E5%88%9D%E5%A7%8B%E5%8C%96%E8%BF%87%E7%A8%8B.jpg" style="zoom:70%;" />
+
+这里再用文字来描述这个过程：
+
+1. 用户在程序中构造 ClassPathXmlApplicationContext（简称 CPAC）
+2. CPAC 首先访问了 “抽象高级容器” 的 final 的 refresh 方法，这个方法是模板方法。所以要回调子类（低级容器）的 refreshBeanFactory 方法，这个方法的作用是使用低级容器加载所有 BeanDefinition 和 Properties 到容器中。
+3. 低级容器加载成功后，高级容器开始处理一些回调，例如 Bean 后置处理器。回调 setBeanFactory 方法。或者注册监听器等，发布事件，实例化单例 Bean 等等功能，这些功能，随着 Spring 的不断升级，功能越来越多，很多人在这里迷失了方向 ：）。
+
+简单说就是：
+
+1. 低级容器 加载配置文件（从 XML，数据库，Applet），并解析成 BeanDefinition 到低级容器中。
+2. 加载成功后，高级容器启动高级功能，例如接口回调，监听器，自动实例化单例，发布事件等等功能。
+
+ 所以，一定要把 “低级容器” 和“高级容器” 的区别弄清楚。不能一叶障目不见泰山。
+
+好，当我们创建好容器，就会使用 getBean 方法，获取 Bean实例对象，getBean 的流程如下：
+
+<img src="https://image.easyblog.top/getBean.png" style="zoom:67%;" />
+
+从图中可以看出，getBean 的操作都是在低级容器（AbstractBeanFactory）里操作的。其中有个递归操作，这个是什么意思呢？
+
+假设：当 Bean_A 依赖着 Bean_B，而这个 Bean_A 在加载的时候，其配置的 ref = “Bean_B” 在解析的时候只是一个占位符，被放入了 Bean_A 的属性集合中，当调用 getBean 时，需要真正 Bean_B 注入到 Bean_A 内部时，就需要从容器中获取这个 Bean_B，因此产生了递归。
+
+为什么不是在加载的时候，就直接注入呢？因为加载的顺序不同，很可能 Bean_A 依赖的 Bean_B 还没有加载好，也就无法从容器中获取，你不能要求用户把 Bean 的加载顺序排列好，这是不人道的。
+
+所以，Spring 将其分为了 2 个步骤：
+
+1. 加载所有的 Bean 配置成 BeanDefinition 到容器中，如果 Bean 有依赖关系，则使用占位符暂时代替。
+2. 然后，在调用 getBean 的时候，进行真正的依赖注入，即如果碰到了属性是 ref 的（占位符），那么就从容器里获取这个 Bean，然后注入到实例中 —— 称之为依赖注入。可以看到，依赖注入实际上，只需要 “低级容器” 就可以实现。
+
+### 7、Spring AOP
+
+**什么是AOP？**
+
+AOP，即面向切面编程。通过预编译的方式和运行期动态代理实现程序功能的统一维护的一种技术。AOP是OOP的延续，是软件开发中的一个热点，也是Spring框架中的一个重要内容，是函数式编程的一种衍生泛型，利用AOP可以对业务逻辑的各个部分进行隔离，从而使业务逻辑各个部分的耦合度降低，提高程序的可重用性，同时提高了开发效率。
+
+**Spring AOP和AspectJ的关系？**
+
+* Spring AOP 使用纯Java代码实现，不需要专门的编译过程和类加载器，在运行期通过代理方式向目标类织入增强代码。
+* `AspectJ`是一个基于Java的**AOP框架**，Spring2.0开始，Spring AOP引入AspectJ的支持，AspectJ扩展了Java语言，提供了一个专门的编译器，在编译时提供横向代码的织入。
+
+**Spring中AOP的实现**
+
+**Spring AOP的底层实现有两种方式：一种是JDK动态代理，另一种是CGLib的方式**。
+
+* JDK动态代理主要涉及java.lang.reflect包下边的两个类：**Proxy和InvocationHandler**。其中，InvocationHandler是一个接口，可以通过实现该接口定义横切逻辑，并通过反射机制调用目标类的代码，动态地将横切逻辑和业务逻辑编织在一起。**JDK动态代理是面向接口的代理模式**，如果被代理目标没有接口那么Spring也无能为力，Spring通过Java的反射机制生产被代理接口的新的匿名实现类，重写了其中AOP的增强方法。
+* **CGLib采用底层的字节码技术**，全称是：Code Generation Library，CGLib可以为一个类创建一个子类，Spring在运行期间通过 CGlib继承要被动态代理的类，重写父类的方法，实现AOP面向切面编程。
+* **JDK动态代理 和 CGLib动态代理性能对比**：在1.6和1.7的时候，JDK动态代理的速度要比CGLib动态代理的速度要慢，但是并没有教科书上的10倍差距，在JDK1.8的时候，JDK动态代理的速度已经比CGLib动态代理的速度快很多了
+
+**Spring AOP的原理**
+
+可以将 AOP 分成 2 个部分来看， 第一：代理的创建； 第二：代理的调用。
+
+**1、代理的创建（按步骤）**：
+
+1. 首先，需要创建代理工厂，代理工厂需要 3 个重要的信息：拦截器数组，目标对象接口数组，目标对象。
+2. 创建代理工厂时，默认会在拦截器数组尾部再增加一个默认拦截器 —— 用于最终的调用目标方法。
+3. 当调用 getProxy 方法的时候，会根据接口数量大余 0 条件返回一个代理对象（JDK or Cglib）。
+
+**2、代理的调用**
+
+1. 当对代理对象进行调用时，就会触发外层拦截器。
+2. 外层拦截器根据代理配置信息，创建内层拦截器链。创建的过程中，会根据表达式判断当前拦截是否匹配这个拦截器。而这个拦截器链设计模式就是职责链模式。
+3. **当整个链条执行到最后时，就会触发创建代理时那个尾部的默认拦截器，从而调用目标方法。最后返回**。
+
+<img src="https://www.javazhiyin.com/wp-content/uploads/2018/10/java1-1539741534.jpg" style="zoom:60%;" />
+
+关于调用过程，来张流程图：
+
+<img src="https://www.javazhiyin.com/wp-content/uploads/2018/10/java7-1539741534.jpg"  style="zoom:67%;" />
+
+
+
+
+
+
+
+
+
+
+
+## 第十章 Spring MVC
+
+
+
+### **1、谈谈Spring MVC的工作流程**
+
+<img src="http://image.easyblog.top/1597936663684c9fe5f02-c484-4866-baf1-88e4a152b2a6.png" style="zoom:50%;" />
+
+SpringMVC的执行流程具体步骤：
+
+第一步：客户端向服务器发起请求，DispatcherServlet（**前端控制器**）捕获用户请求
+
+第二步：DispatcherServlet对请求的URL进行解析得到URI，并根据URI调用**HandlerMapping**查找Handler（可以根据xml配置，注解进行查找）并返回一个Handler
+
+第三步：HandlerMapping向前端控制器返回Handler，HandlerMapping会把请求映射为**HandlerExecutionChain**对象（包含一个Handler处理器（页面控制器）对象，多个HandlerInterceptor拦截器对象），通过这种策略模式，很容易添加新的映射策略
+
+第四步：DispatcherServlet根据得到的Handler选择一个合适的HandlerAdapter，提取Request中的模型数据，填充Handler入参，开始执行目标Contorller中的方法
+
+第五步：Contorller执行完成后选择一个合适的ViewResolver将返回对象**ModelAndView**返回给DispatcherServlet
+
+第六步：ViewResolver结合View和Model渲染视图并将渲染结果（HTML页面）返回给客户端。
+
+
+
+### 2、拦截器是什么，什么场景使用？
+
+ Spring MVC中的拦截器（Interceptor）类似Servlet中的过滤器（Filter），但是比过滤器的功能更强大，它主要用于拦截用户请求并作相应的处理。例如**通过拦截器可以进行权限验证，记录请求信息的日志，判断用户是否登录，解决乱码问题等**。要使用Spring MVC中的拦截器，就需要对拦截器类进行定义和配置。通常拦截器类可以通过两种方式来定义：
+
+1.通过实现HandlerInterceptor
+
+ 2.通过实现WebRequestInterceptor接口，或继承WebRequestInterceptor接口的实现类来定义。
+
+HandlerInterceptor接口中有三种方法：
+
+- preHandle（）：在目标方法执行之前回执行，有个布尔类型的返回值，当返回真表示放行，即允许执行目标方法；当返回false，表示不放行，即不运行执行目标方法，此时会中断以后的所有过程
+- postHandle（）：在目标方法执行结束后会执行，并且解析视图之前执行
+- afterCompletion（）：在请求到达页面，即视图渲染完成后执行
+
+**拦截器和过滤器比较**
+①拦截器是基于java的反射机制的，而过滤器是基于函数回调。
+②拦截器不依赖与servlet容器，过滤器依赖与servlet容器。
+③拦截器只能对action请求起作用，而过滤器则可以对几乎所有的请求起作用。
+④拦截器可以访问action上下文、值栈里的对象，而过滤器不能访问。
+⑤在action的生命周期中，拦截器可以多次被调用，而过滤器只能在容器初始化时被调用一次。
+⑥拦截器可以获取IOC容器中的各个bean，而过滤器就不行，这点很重要，在拦截器里注入一个service，可以调用业务逻辑
+
+
+
+### 3、Spring中常见的使用多的注解有哪些
+
+* 1、@Controller
+
+  在SpringMVC 中提供了一个非常简便的定义Controller 的方法，你无需继承特定的类或实现特定的接口，只需使用@Controller 标记一个类是Controller ，然后使用@RequestMapping 和@RequestParam 等一些注解用以定义URL 请求和Controller 方法之间的映射，这样的Controller 就能被外界访问到。
+
+* 2、@RequestMapping
+
+  RequestMapping是一个用来处理请求地址映射的注解，可用于类或方法上。用于类上，表示类中的所有响应请求的方法都是以该地址作为父路径。
+
+* 3、@Resource和@Autowired
+
+  @Resource和@Autowired都是做bean的注入时使用，其实@Resource并不是Spring的注解，它的包是javax.annotation.Resource，需要导入，但是Spring支持该注解的注入。
+
+* 4、@ModelAttribute和 @SessionAttributes
+
+  代表的是：该Controller的所有方法在调用前，先执行此@ModelAttribute方法，可用于注解和方法参数中，可以把这个@ModelAttribute特性，应用在BaseController当中，所有的Controller继承BaseController，即可实现在调用Controller时，先执行@ModelAttribute方法。
+  @SessionAttributes即将值放到session作用域中，写在class上面。
+
+* 5、@PathVariable
+
+  用于将请求URL中的模板变量映射到功能处理方法的参数上，即取出uri模板中的变量作为参数。
+
+* 6、@RequestParam
+
+  @RequestParam主要用于在SpringMVC后台控制层获取参数，类似一种是request.getParameter("name")，它有三个常用参数：defaultValue = "0", required = false, value = "isApp"；defaultValue 表示设置默认值，required 铜过boolean设置是否是必须要传入的参数，value 值表示接受的传入的参数类型。
+
+* 7、@ResponseBody
+
+  作用： 该注解用于将Controller的方法返回的对象，通过适当的HttpMessageConverter转换为指定格式后，写入到Response对象的body数据区。
+  使用时机：返回的数据不是html标签的页面，而是其他某种格式的数据时（如json、xml等）使用；
+
+* 8、@Component
+
+  于通用的注解，当不知道一些类归到哪个层时使用，但是不建议。
+
+* 9、@Repository
+  用于注解dao层，在daoImpl类上面注解
+
+##### 4、你之前项目中异常/国际化如何处理
+
+**优雅的处理异常**
+
+Spring 在 3.2 版本已经为我们提供了该功能： @ControllerAdvice 注解。此注解会捕捉Controller层抛出的异常，并根据 @ExceptionHandler 注解配置的方法进行异常处理。
+
+一般在项目现在项目都是前后端分离的项目，返回的前端的一般都是JSON，因此为了统一管理，在项目中我会定义一个Controller返回对象专门用于返回各种信息给前端，一般我们都会在对象中定义三个字段：处理结果码code，处理结果信息msg、处理响应数据data(是个泛型)，除此之外还会定义一个系统异常枚举类，专门用于枚举系统中可能会出现的异常并继承RuntimeException实现一个自定义的异常，之后再需要抛异常的地方就通过自定义异常和自定义返回对象来给前端抛出异常。
+
+<img src="https://image.easyblog.top/QQ%E6%88%AA%E5%9B%BE20210126151012.png" style="zoom:67%;" />
+
+**资源国际化**
+
+* 1、编写国际化资源文件：国际化资源文件就是使用一种键值的形式把要显示的信息的不同语言的翻译版本写到属性资源文件中。一般情况下我们用`*._zh_CN.properties`表示中文资源文件，`*._en_US.properties`表示英文资源，`*.properties`表示替代的资源文件。详请参考下图：
+
+  <img src="https://i.loli.net/2019/08/14/OEKzenjBUhvIGDq.png" alt="img" style="zoom:50%;" />
+
+* 2、自定义区域信息解析器
+
+  （1）写一个类实现LocaleResolver接口或他的子接口或继承他的实现类，最主要是要实现它的resolveLocale()方法
+
+  （2）在springmvc的配置文件中注册自定义的区域信息解析器
+
+  （3）启动测试
+
+
+
+##  附录：智力题 & 数学题
 
 ##### 二进制问题
 
@@ -6163,307 +6501,3 @@ B＝（另一个也是女孩）＝（女女）
 ```
 
 
-
-
-
-#### Spring体系
-
-##### 1、说一下spring中Bean的作用域
-
-**singleton：**
-
-  Spring IoC容器中只会存在一个共享的Bean实例，无论有多少个Bean引用它，始终指向同一对象。Singleton作用域是Spring中的缺省作用域。
-
-**prototype：**
-
-  每次通过Spring容器获取prototype定义的bean时，容器都将创建一个新的Bean实例，每个Bean实例都有自己的属性和状态，而singleton全局只有一个对象。
-
-**request：**
-
-  在一次Http请求中，容器会返回该Bean的同一实例。而对不同的Http请求则会产生新的Bean，而且该bean仅在当前Http Request内有效。
-
-**session：**
-
-  在一次Http Session中，容器会返回该Bean的同一实例。而对不同的Session请求则会创建新的实例，该bean实例仅在当前Session内有效。
-
-**global Session：**
-
-  在一个全局的Http Session中，容器会返回该Bean的同一个实例，仅在使用portlet context时有效。
-
-##### 2、说一下spring中Bean的生命周期
-
-<img src="https://img-blog.csdnimg.cn/20201028180446251.png?x-oss-process=image/watermark,type_ZmFuZ3poZW5naGVpdGk,shadow_10,text_aHR0cHM6Ly9ibG9nLmNzZG4ubmV0L3dlaXhpbl80MzI0NDY5OA==,size_16,color_FFFFFF,t_70#pic_center" style="width:69%;" />
-
-- 实例化一个Bean，也就是我们通常说的new。
-- 按照Spring上下文对实例化的Bean进行配置，也就是IOC注入。
-- 如果这个Bean实现了BeanNameAware接口，会调用它实现的setBeanName(String beanId)方法，此处传递的是Spring配置文件中Bean的ID。
-- 如果这个Bean实现了BeanFactoryAware接口，会调用它实现的setBeanFactory()，传递的是Spring工厂本身（可以用这个方法获取到其他Bean）。
-- 如果这个Bean实现了ApplicationContextAware接口，会调用setApplicationContext(ApplicationContext)方法，传入Spring上下文。
-- 如果这个Bean关联了BeanPostProcessor接口，将会调用postProcessBeforeInitialization(Object obj, String s)方法，BeanPostProcessor经常被用作是Bean内容的更改，并且由于这个是在Bean初始化结束时调用After方法，也可用于内存或缓存技术。
-- 如果这个Bean在Spring配置文件中配置了init-method属性会自动调用其配置的初始化方法。
-- 如果这个Bean关联了BeanPostProcessor接口，将会调用postAfterInitialization(Object obj, String s)方法。
-- 当Bean不再需要时，会经过清理阶段，如果Bean实现了DisposableBean接口，会调用其实现的destroy方法。
-- 最后，如果这个Bean的Spring配置中配置了destroy-method属性，会自动调用其配置的销毁方法。
-
-##### 3、**对Spring中依赖注入（DI）三种方式的认识**
-
-**三种注入方式为：构造方法注入、setter方法注入和使用字段(Filed)注入（用注解方式）**
-
-1. 设值注入与传统的JavaBean的写法更相似，程序员更容易理解、接受，通过setter方式设定依赖关系显得更加直观、明显;
-2. 对于复杂的依赖关系，如果采用构造注入，会导致构造器过于臃肿，难以阅读。Spring在创建Bean实例时，需要同时实例化其依赖的全部实例，因而会产生浪费。而使用设置注入，则避免这下问题;
-3. 在某些属性可选的情况下，多参数的构造器更加笨拙，官方更鼓励使用设值注入。
-4. 构造注入可以在构造器中决定依赖关系的注入顺序，优先依赖的优先注入。
-5. 对于依赖关系无须变化的Bean，构造注入更有用处，因为没有setter方法，所有的依赖关系全部在构造器内设定，因此，不用担心后续代码对依赖关系的破坏。
-6. 构造注入使依赖关系只能在构造器中设定，则只有组件的创建者才能改变组件的依赖关系。对组件的调用者而言，组件内部的依赖关系完全透明，更符合高内聚的原则。
-7. 设值注入不会重写构造方法的值。如果我们对同一个变量同时使用了构造方法注入又使用了设置方法注入的话，那么构造方法将不能覆盖由设值方法注入的值。
-8. 建议采用以设值注入为主，构造注入为辅的注入策略。对于依赖关系无须变化的注入，尽量采用构造注入;而其他的依赖关系的注入，则考虑采用set注入。
-
-##### **4、Spring框架中都用到了哪些设计模式？**
-
-- 代理模式：在AOP和remoting中被用的比较多。
-- 单例模式：在spring配置文件中定义的bean默认为单例模式。
-- 模板方法模式：用来解决代码重复的问题。
-- 前端控制器模式：Spring提供了DispatcherServlet来对请求进行分发。
-- 依赖注入模式：贯穿于BeanFactory / ApplicationContext接口的核心理念。
-- 工厂模式：BeanFactory用来创建对象的实例。
-
-##### **5、BeanFactory 和ApplicationContext的区别**
-
-BeanFactory 粗暴简单，可以理解为就是个 HashMap，Key 是 BeanName，Value 是 Bean 实例。通常只提供注册（put），获取（get）这两个功能。我们可以称之为 “低级容器”。
-
-ApplicationContext 可以称之为 “高级容器”。因为他比 BeanFactory 多了更多的功能。他继承了多个接口。因此具备了更多的功能（例如资源的获取，支持多种消息（例如 JSP tag 的支持），对 BeanFactory 多了工具级别的支持等待。所以你看他的名字，已经不是 BeanFactory 之类的工厂了，而是 “应用上下文”， 代表着整个大容器的所有功能。）。该接口定义了一个 refresh 方法，此方法是所有阅读 Spring 源码的人的最熟悉的方法，用于刷新整个容器，即重新加载/刷新所有的 bean。
-
-##### 6、spring IOC了解吗？讲一下
-
-控制反转（`Inversion of Control`，简称`IoC`），是面向对象编程中的一种设计原则，可以用来降低代码之间的耦合度。其中最常见的方式叫做依赖注入（`Dependency Injection`，简称`DI`），还有一种方式叫“依赖查找”（`Dependency Lookup`）。通过控制反转，对象在被创建的时候，由一个调控系统内所有对象的外界实体，将其所依赖的对象的引用传递(注入)给它。
-
-谁控制谁，控制什么：
-
-- 在之前，没有IOC时，我们直接在对象内部通过new进行创建对象，是程序主动去创建依赖对象；
-- 而现在，是由IOC专门一个容器来创建这些对象，即由Ioc容器来控制对 象的创建；
-- `谁控制谁？`当然是IOC容器控制了对象；`控制什么？`那就是主要控制了外部资源获取（不只是对象还包括比如文件等）。
-
-所谓反转：
-
-- 所谓的反转，其实是反转的控制权，由 `Spring` 来控制对象的生命周期，那么对象的控制就完全脱离了我们的控制，控制权交给了`Spring`。这个反转是指：我们由对象的控制者变成了`IOC` 的被动控制者。
-
-**IOC的两种实现：依赖查找（DL）和依赖注入（DI）**。
-
-IOC 和 DI 、DL 的关系：
-
-<img src="https://www.javazhiyin.com/wp-content/uploads/2020/12/java5-1609402546.png" style="zoom:70%;" />
-
-- DI（`Dependency Injection`） 是 Spring 使用的方式，容器负责组件的装配。是 `IOC` 的具体实现。程序把依赖交给容器，容器帮你管理依赖。
-- DL（`Dependency Lookup`）已经被抛弃。
-
-**IOC容器的原理**
-
-IOC容器其实就是一个大工厂，它用来管理我们所有的对象以及依赖关系。原理就是通过Java的反射技术来实现的！通过反射我们可以获取类的所有信息(成员变量、类名等等等)！再通过配置文件(xml)或者注解来描述类与类之间的关系。我们就可以通过这些配置信息和反射技术来构建出对应的对象和依赖关系了！
-
-我们简单来看看实际Spring IOC容器是怎么实现对象的创建和依赖的：
-
-<img src="https://www.javazhiyin.com/wp-content/uploads/2020/12/java6-1609402546.jpeg"  style="zoom:67%;" />
-
-1. 根据Bean配置信息[在容器内部创建Bean](http://mp.weixin.qq.com/s?__biz=MzU2MTI4MjI0MQ==&mid=2247496582&idx=1&sn=d0253316d1b3efe8f66ab44dd4774817&chksm=fc799e28cb0e173e59a33aba80c96830fbff7260bea8d252504077bda776d7b8ba64a0eea4be&scene=21#wechat_redirect)定义注册表
-2. 根据注册表加载、实例化bean、建立Bean与Bean之间的依赖关系
-3. 将这些准备就绪的Bean放到Map缓存池中，等待应用程序调用
-
-**IOC容器体系**
-
-Spring容器(Bean工厂)可简单分成两种：BeanFactory（"低级容器"）和ApplicationContext（”高级容器“），ApplicationContext是BeanFactory的子类。为了更直观的展示 “低级容器” 和 “高级容器” 的关系，我这里通过常用的 ClassPathXmlApplicationContext 类，来展示整个容器的层级 UML 关系。
-
-<img src="https://image.easyblog.top/%E5%BE%AE%E4%BF%A1%E5%9B%BE%E7%89%87_20210125141655.jpg" style="zoom:67%;" />
-
-最上面的 BeanFactory 知道吧？我就不讲了。
-
-下面的 3 个绿色的，都是功能扩展接口，这里就不展开讲。
-
-看下面的隶属 ApplicationContext 粉红色的 “高级容器”，依赖着 “低级容器”，这里说的是依赖，不是继承哦。他依赖着 “低级容器” 的 getBean 功能。而高级容器有更多的功能：支持不同的信息源头，可以访问文件资源，支持应用事件（Observer 模式）。
-
-通常用户看到的就是 “高级容器”。 但 BeanFactory 也非常够用啦！
-
-左边灰色区域的是 “低级容器”， 只负载加载 Bean，获取 Bean。容器其他的高级功能是没有的。例如上图画的 refresh 刷新 Bean 工厂所有配置。生命周期事件回调等。
-
-**IOC容器初始化过程**
-
-> 解释了低级容器和高级容器，我们可以看看一个 IoC 启动过程是什么样子的。说白了，就是 ClassPathXmlApplicationContext 这个类，在启动时，都做了啥。（由于我这是 interface21 的代码，肯定和你的 Spring 4.x 系列不同）。
-
-下图是 ClassPathXmlApplicationContext 的构造过程，实际就是 Spring IoC 的初始化过程。
-
-<img src="https://image.easyblog.top/spring%20IOC%20%E5%88%9D%E5%A7%8B%E5%8C%96%E8%BF%87%E7%A8%8B.jpg" style="zoom:70%;" />
-
-这里再用文字来描述这个过程：
-
-1. 用户在程序中构造 ClassPathXmlApplicationContext（简称 CPAC）
-2. CPAC 首先访问了 “抽象高级容器” 的 final 的 refresh 方法，这个方法是模板方法。所以要回调子类（低级容器）的 refreshBeanFactory 方法，这个方法的作用是使用低级容器加载所有 BeanDefinition 和 Properties 到容器中。
-3. 低级容器加载成功后，高级容器开始处理一些回调，例如 Bean 后置处理器。回调 setBeanFactory 方法。或者注册监听器等，发布事件，实例化单例 Bean 等等功能，这些功能，随着 Spring 的不断升级，功能越来越多，很多人在这里迷失了方向 ：）。
-
-简单说就是：
-
-1. 低级容器 加载配置文件（从 XML，数据库，Applet），并解析成 BeanDefinition 到低级容器中。
-2. 加载成功后，高级容器启动高级功能，例如接口回调，监听器，自动实例化单例，发布事件等等功能。
-
- 所以，一定要把 “低级容器” 和“高级容器” 的区别弄清楚。不能一叶障目不见泰山。
-
-好，当我们创建好容器，就会使用 getBean 方法，获取 Bean实例对象，getBean 的流程如下：
-
-<img src="https://image.easyblog.top/getBean.png" style="zoom:67%;" />
-
-从图中可以看出，getBean 的操作都是在低级容器（AbstractBeanFactory）里操作的。其中有个递归操作，这个是什么意思呢？
-
-假设：当 Bean_A 依赖着 Bean_B，而这个 Bean_A 在加载的时候，其配置的 ref = “Bean_B” 在解析的时候只是一个占位符，被放入了 Bean_A 的属性集合中，当调用 getBean 时，需要真正 Bean_B 注入到 Bean_A 内部时，就需要从容器中获取这个 Bean_B，因此产生了递归。
-
-为什么不是在加载的时候，就直接注入呢？因为加载的顺序不同，很可能 Bean_A 依赖的 Bean_B 还没有加载好，也就无法从容器中获取，你不能要求用户把 Bean 的加载顺序排列好，这是不人道的。
-
-所以，Spring 将其分为了 2 个步骤：
-
-1. 加载所有的 Bean 配置成 BeanDefinition 到容器中，如果 Bean 有依赖关系，则使用占位符暂时代替。
-2. 然后，在调用 getBean 的时候，进行真正的依赖注入，即如果碰到了属性是 ref 的（占位符），那么就从容器里获取这个 Bean，然后注入到实例中 —— 称之为依赖注入。可以看到，依赖注入实际上，只需要 “低级容器” 就可以实现。
-
-##### 7、spring AOP了解吗？讲一下
-
-**什么是AOP？**
-
-AOP，即面向切面编程。通过预编译的方式和运行期动态代理实现程序功能的统一维护的一种技术。AOP是OOP的延续，是软件开发中的一个热点，也是Spring框架中的一个重要内容，是函数式编程的一种衍生泛型，利用AOP可以对业务逻辑的各个部分进行隔离，从而使业务逻辑各个部分的耦合度降低，提高程序的可重用性，同时提高了开发效率。
-
-**Spring AOP和AspectJ的关系？**
-
-* Spring AOP 使用纯Java代码实现，不需要专门的编译过程和类加载器，在运行期通过代理方式向目标类织入增强代码。
-* `AspectJ`是一个基于Java的**AOP框架**，Spring2.0开始，Spring AOP引入AspectJ的支持，AspectJ扩展了Java语言，提供了一个专门的编译器，在编译时提供横向代码的织入。
-
-**Spring中AOP的实现**
-
-**Spring AOP的底层实现有两种方式：一种是JDK动态代理，另一种是CGLib的方式**。
-
-* JDK动态代理主要涉及java.lang.reflect包下边的两个类：**Proxy和InvocationHandler**。其中，InvocationHandler是一个接口，可以通过实现该接口定义横切逻辑，并通过反射机制调用目标类的代码，动态地将横切逻辑和业务逻辑编织在一起。**JDK动态代理是面向接口的代理模式**，如果被代理目标没有接口那么Spring也无能为力，Spring通过Java的反射机制生产被代理接口的新的匿名实现类，重写了其中AOP的增强方法。
-* **CGLib采用底层的字节码技术**，全称是：Code Generation Library，CGLib可以为一个类创建一个子类，Spring在运行期间通过 CGlib继承要被动态代理的类，重写父类的方法，实现AOP面向切面编程。
-* **JDK动态代理 和 CGLib动态代理性能对比**：在1.6和1.7的时候，JDK动态代理的速度要比CGLib动态代理的速度要慢，但是并没有教科书上的10倍差距，在JDK1.8的时候，JDK动态代理的速度已经比CGLib动态代理的速度快很多了
-
-**Spring AOP的原理**
-
-可以将 AOP 分成 2 个部分来看， 第一：代理的创建； 第二：代理的调用。
-
-##### 1、代理的创建（按步骤）：
-
-1. 首先，需要创建代理工厂，代理工厂需要 3 个重要的信息：拦截器数组，目标对象接口数组，目标对象。
-2. 创建代理工厂时，默认会在拦截器数组尾部再增加一个默认拦截器 —— 用于最终的调用目标方法。
-3. 当调用 getProxy 方法的时候，会根据接口数量大余 0 条件返回一个代理对象（JDK or Cglib）。
-
-##### 2、代理的调用
-
-1. 当对代理对象进行调用时，就会触发外层拦截器。
-2. 外层拦截器根据代理配置信息，创建内层拦截器链。创建的过程中，会根据表达式判断当前拦截是否匹配这个拦截器。而这个拦截器链设计模式就是职责链模式。
-3. 当整个链条执行到最后时，就会触发创建代理时那个尾部的默认拦截器，从而调用目标方法。最后返回。
-
-<img src="https://www.javazhiyin.com/wp-content/uploads/2018/10/java1-1539741534.jpg" style="zoom:60%;" />
-
-关于调用过程，来张流程图：
-
-<img src="https://www.javazhiyin.com/wp-content/uploads/2018/10/java7-1539741534.jpg"  style="zoom:67%;" />
-
-##### **8、谈谈Spring MVC的工作流程**
-
-<img src="http://image.easyblog.top/1597936663684c9fe5f02-c484-4866-baf1-88e4a152b2a6.png" style="zoom:50%;" />
-
-SpringMVC的执行流程具体步骤：
-
-第一步：客户端向服务器发起请求，DispatcherServlet（**前端控制器**）捕获用户请求
-
-第二步：DispatcherServlet对请求的URL进行解析得到URI，并根据URI调用**HandlerMapping**查找Handler（可以根据xml配置，注解进行查找）并返回一个Handler
-
-第三步：HandlerMapping向前端控制器返回Handler，HandlerMapping会把请求映射为**HandlerExecutionChain**对象（包含一个Handler处理器（页面控制器）对象，多个HandlerInterceptor拦截器对象），通过这种策略模式，很容易添加新的映射策略
-
-第四步：DispatcherServlet根据得到的Handler选择一个合适的HandlerAdapter，提取Request中的模型数据，填充Handler入参，开始执行目标Contorller中的方法
-
-第五步：Contorller执行完成后选择一个合适的ViewResolver将返回对象**ModelAndView**返回给DispatcherServlet
-
-第六步：ViewResolver结合View和Model渲染视图并将渲染结果（HTML页面）返回给客户端。
-
-
-
-##### 9、拦截器是什么，什么场景使用？
-
- Spring MVC中的拦截器（Interceptor）类似Servlet中的过滤器（Filter），但是比过滤器的功能更强大，它主要用于拦截用户请求并作相应的处理。例如**通过拦截器可以进行权限验证，记录请求信息的日志，判断用户是否登录，解决乱码问题等**。要使用Spring MVC中的拦截器，就需要对拦截器类进行定义和配置。通常拦截器类可以通过两种方式来定义：
-
-1.通过实现HandlerInterceptor
-
- 2.通过实现WebRequestInterceptor接口，或继承WebRequestInterceptor接口的实现类来定义。
-
-HandlerInterceptor接口中有三种方法：
-
-- preHandle（）：在目标方法执行之前回执行，有个布尔类型的返回值，当返回真表示放行，即允许执行目标方法；当返回false，表示不放行，即不运行执行目标方法，此时会中断以后的所有过程
-- postHandle（）：在目标方法执行结束后会执行，并且解析视图之前执行
-- afterCompletion（）：在请求到达页面，即视图渲染完成后执行
-
-**拦截器和过滤器比较**
-①拦截器是基于java的反射机制的，而过滤器是基于函数回调。
-②拦截器不依赖与servlet容器，过滤器依赖与servlet容器。
-③拦截器只能对action请求起作用，而过滤器则可以对几乎所有的请求起作用。
-④拦截器可以访问action上下文、值栈里的对象，而过滤器不能访问。
-⑤在action的生命周期中，拦截器可以多次被调用，而过滤器只能在容器初始化时被调用一次。
-⑥拦截器可以获取IOC容器中的各个bean，而过滤器就不行，这点很重要，在拦截器里注入一个service，可以调用业务逻辑
-
-
-
-##### 10、Spring中常见的使用多的注解有哪些
-
-* 1、@Controller
-
-	在SpringMVC 中提供了一个非常简便的定义Controller 的方法，你无需继承特定的类或实现特定的接口，只需使用@Controller 标记一个类是Controller ，然后使用@RequestMapping 和@RequestParam 等一些注解用以定义URL 请求和Controller 方法之间的映射，这样的Controller 就能被外界访问到。
-
-* 2、@RequestMapping
-
-	RequestMapping是一个用来处理请求地址映射的注解，可用于类或方法上。用于类上，表示类中的所有响应请求的方法都是以该地址作为父路径。
-
-* 3、@Resource和@Autowired
-
-	@Resource和@Autowired都是做bean的注入时使用，其实@Resource并不是Spring的注解，它的包是javax.annotation.Resource，需要导入，但是Spring支持该注解的注入。
-
-* 4、@ModelAttribute和 @SessionAttributes
-
-	代表的是：该Controller的所有方法在调用前，先执行此@ModelAttribute方法，可用于注解和方法参数中，可以把这个@ModelAttribute特性，应用在BaseController当中，所有的Controller继承BaseController，即可实现在调用Controller时，先执行@ModelAttribute方法。
-	@SessionAttributes即将值放到session作用域中，写在class上面。
-
-* 5、@PathVariable
-
-	用于将请求URL中的模板变量映射到功能处理方法的参数上，即取出uri模板中的变量作为参数。
-
-* 6、@RequestParam
-
-	@RequestParam主要用于在SpringMVC后台控制层获取参数，类似一种是request.getParameter("name")，它有三个常用参数：defaultValue = "0", required = false, value = "isApp"；defaultValue 表示设置默认值，required 铜过boolean设置是否是必须要传入的参数，value 值表示接受的传入的参数类型。
-
-* 7、@ResponseBody
-
-	作用： 该注解用于将Controller的方法返回的对象，通过适当的HttpMessageConverter转换为指定格式后，写入到Response对象的body数据区。
-	使用时机：返回的数据不是html标签的页面，而是其他某种格式的数据时（如json、xml等）使用；
-
-* 8、@Component
-
-	于通用的注解，当不知道一些类归到哪个层时使用，但是不建议。
-
-* 9、@Repository
-	用于注解dao层，在daoImpl类上面注解
-
-##### 11、你之前项目中异常/国际化如何处理
-
-**优雅的处理异常**
-
-Spring 在 3.2 版本已经为我们提供了该功能： @ControllerAdvice 注解。此注解会捕捉Controller层抛出的异常，并根据 @ExceptionHandler 注解配置的方法进行异常处理。
-
-一般在项目现在项目都是前后端分离的项目，返回的前端的一般都是JSON，因此为了统一管理，在项目中我会定义一个Controller返回对象专门用于返回各种信息给前端，一般我们都会在对象中定义三个字段：处理结果码code，处理结果信息msg、处理响应数据data(是个泛型)，除此之外还会定义一个系统异常枚举类，专门用于枚举系统中可能会出现的异常并继承RuntimeException实现一个自定义的异常，之后再需要抛异常的地方就通过自定义异常和自定义返回对象来给前端抛出异常。
-
-<img src="https://image.easyblog.top/QQ%E6%88%AA%E5%9B%BE20210126151012.png" style="zoom:67%;" />
-
-**资源国际化**
-
-* 1、编写国际化资源文件：国际化资源文件就是使用一种键值的形式把要显示的信息的不同语言的翻译版本写到属性资源文件中。一般情况下我们用`*._zh_CN.properties`表示中文资源文件，`*._en_US.properties`表示英文资源，`*.properties`表示替代的资源文件。详请参考下图：
-
-	<img src="https://i.loli.net/2019/08/14/OEKzenjBUhvIGDq.png" alt="img" style="zoom:50%;" />
-
-* 2、自定义区域信息解析器
-
-	（1）写一个类实现LocaleResolver接口或他的子接口或继承他的实现类，最主要是要实现它的resolveLocale()方法
-
-	（2）在springmvc的配置文件中注册自定义的区域信息解析器
-
-	（3）启动测试
