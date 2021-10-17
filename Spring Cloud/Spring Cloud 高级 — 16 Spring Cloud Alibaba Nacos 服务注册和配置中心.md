@@ -287,7 +287,17 @@ public interface PaymentFeignClient {
 
 
 
-### 3.3  Nacos 集群搭建
+### 3.3  Nacos 集群和持久化配置
+
+#### 1、Nacos集群搭建原理简介
+
+
+
+#### 2、配置Nacos持久化数据库为MySQL
+
+
+
+#### 3、
 
 
 
@@ -295,9 +305,113 @@ public interface PaymentFeignClient {
 
 
 
-**Nacos全景图**
+接上节 [Nacos服务注册于服务发现配置使用]()，本节我们继续来了解学习一下Nacos做分布式的配置中心如何使用/配置。
 
-![](https://image.easyblog.top/image-20211010174528647.png)
+首先新建配置中心模块 `cloudalibaba-config-nacos-client3377` 
+
+#### 1、在 pom.xml 中引入Naocs相关依赖
+
+```xml
+ <!--nacos-config-->                                                      
+ <dependency>                                                             
+     <groupId>com.alibaba.cloud</groupId>                                 
+     <artifactId>spring-cloud-starter-alibaba-nacos-config</artifactId>   
+ </dependency>                                                            
+ <!--nacos-discovery-->                                                   
+ <dependency>                                                             
+     <groupId>com.alibaba.cloud</groupId>                                 
+     <artifactId>spring-cloud-starter-alibaba-nacos-discovery</artifactId>
+ </dependency>                                                            
+```
+
+#### 2、新建 bootstrap.yml 配置文件
+
+```yml
+server:
+  port: 3377
+
+spring:
+  application:
+    name: nacos-config-client
+  cloud:
+    nacos:
+      discovery:
+        server-addr: 127.0.0.1:8848
+      config:
+        server-addr: 127.0.0.1:8848
+        file-extension: yml   #配置文件后缀名
+```
+
+#### 3、新建application.yml 配置文件
+
+```yml
+spring:
+  profiles:
+    active: dev   #表示开发环境
+```
+
+#### 4、新建主启动类
+
+```java
+@SpringBootApplication
+@EnableDiscoveryClient
+public class NacosConfigClientApplication {
+
+    public static void main(String[] args) {
+        SpringApplication.run(NacosConfigClientApplication.class,args);
+    }
+
+}
+```
 
 
+
+#### 5、在nacos中添加配置信息
+
+（1）登陆Nacos管理后台新建配置列表
+
+![](https://image.easyblog.top/QQ%E6%88%AA%E5%9B%BE20211016125209.png)
+
+（2）填写配置信息
+
+![](https://image.easyblog.top/QQ%E6%88%AA%E5%9B%BE20211016125739.png)
+
+Nacos配置列表`dataId`填写规则：
+
+![](https://image.easyblog.top/QQ%E6%88%AA%E5%9B%BE20211016124849.png)
+
+
+
+（3）发布配置信息
+
+完成配置之后点击下方发布按钮保存并发布配置信息，成功之后会弹框提示。
+
+<img src="https://image.easyblog.top/QQ%E6%88%AA%E5%9B%BE20211016125830.png" style="zoom:60%;" />
+
+
+
+#### 6、编写controller用于测试
+
+```java
+@Slf4j
+@RestController
+@RefreshScope   //实现自动更新配置
+public class NacosConfigController {
+
+    @Value("${config.info}")
+    private String configInfo;
+
+    @GetMapping("/config/info")
+    public String getConfigInfo() {
+        return configInfo;
+    }
+
+}
+```
+
+
+
+编写完成之后，启动项目，访问地址：http://http://127.0.0.1:3377/config/info ，可以看到程序读取到配置了：
+
+![](https://image.easyblog.top/QQ%E6%88%AA%E5%9B%BE20211016131432.png)
 
