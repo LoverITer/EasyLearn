@@ -33,7 +33,7 @@
 
 这种松耦合的方式使得开发、部署都变得更加`灵活`，同时系统更容易扩展，降低了开发、运维的难度，单体应用拆分之后的架构如下图所示。
 
-<img src="https://upload-images.jianshu.io/upload_images/16751762-2df2cf7cd36f9531.png?imageMogr2/auto-orient/strip|imageView2/2/w/855" style="zoom:67%;" />
+![](http://image.easyblog.top/micorservice.jpg)
 
 
 
