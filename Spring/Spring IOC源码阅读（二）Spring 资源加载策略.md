@@ -11,7 +11,7 @@
 
 `org.springframework.core.io.Resource` 是 Spring 框架所有资源的抽象和访问接口，它继承 `org.springframework.core.io.InputStreamSource` 接口。作为所有资源的统一抽象，Resource 定义了一些通用的方法，并由子类 `AbstractResource` 提供统一的默认实现。
 
-![](https://www.cmsblogs.com/images/group/sike-java/sike-java-spring-ioc/202105092051297881.png)
+![](http://image.easyblog.top/202105092051297881.png)
 
 从上图可以看到，Resource 根据资源的不同类型提供不同的具体实现，如下：
 
@@ -165,7 +165,7 @@ public abstract class AbstractResource implements Resource {
 
 ### ResourceLoader：统一资源定位
 
-![](https://www.cmsblogs.com/images/group/sike-java/sike-java-spring-ioc/202105092051301142.png)
+![](http://image.easyblog.top/202105092051301142.png)
 
 Spring 通过 `Resource` 接口完成了对程序世界各种资源的定义，现在资源定义好了，就该有个东西去加载资源。为此，Spring 定义了`org.springframework.core.io.ResourceLoader` ，它抽象了加载资源的具体行为，具体的资源加载则由相应的实现类来完成，所以我们可以将 ResourceLoader 称作为统一资源定位器。如下是ResourceLoader源码定义：
 
@@ -363,7 +363,7 @@ public Resource[] getResources(String locationPattern) throws IOException {
 
 程序执行流程如下：
 
-![](https://www.cmsblogs.com/images/group/sike-java/sike-java-spring-ioc/202105092051327943.png)
+![](http://image.easyblog.top/202105092051327943.png)
 
 **findAllClassPathResources**
 
@@ -427,7 +427,24 @@ protected Set<Resource> doFindAllClassPathResources(String path) throws IOExcept
 
 **findPathMatchingResources**
 
-当 locationPattern 以 `classpath*:` 开头且当中包含了通配符，则调用该方法进行资源加载：
+当 locationPattern 以 `classpath*:` 开头且当中包含了通配符，则调用该方法进行资源加载，方法有点长，这里不再贴出来，但是思路还是很清晰的，主要分两步：
 
-https://www.cmsblogs.com/article/1391375268060467201
+* 确定目录，获取该目录下得所有资源
+* 在所获得的所有资源中进行迭代匹配获取我们想要的资源。
+
+该方法一定要给出一个确定的根目录。该根目录用于确定文件的匹配的起始点，将根目录位置的资源解析为 `java.io.File` 并将其传递到 `retrieveMatchingFiles()`，其余为知用于模式匹配，找出我们所需要的资源。
+
+| 原路径                              | 确定根路径           |
+| ----------------------------------- | -------------------- |
+| classpath\*:test/cc\*/spring-\*.xml | classpath\*:test/    |
+| classpath\*:test/aa/spring-*.xml    | classpath\*:test/aa/ |
+
+确定根路径后，则调用 `getResources()` 方法获取该路径下得所有资源，然后迭代资源获取符合条件的资源。
+
+至此 Spring 整个资源记载过程已经分析完毕。下面简要总结下：
+
+- Spring 提供了 Resource 和 ResourceLoader 来统一抽象整个资源和资源加载。使得资源与资源的加载有了一个更加清晰的界限，并且提供了合适的 Default 类，使得自定义实现更加方便和清晰。
+- AbstractResource 为 Resource 的默认实现，它对 Resource 接口做了一个统一的实现，子类继承该类后只需要覆盖相应的方法即可，同时对于自定义的 Resource 我们也是继承该类。
+- DefaultResourceLoader 同样也是 ResourceLoader 的默认实现，在自定 ResourceLoader 的时候我们除了可以继承该类外还可以实现 ProtocolResolver 接口来实现自定资源加载协议。
+- DefaultResourceLoader 每次只能返回单一的资源，所以 Spring 针对这个提供了另外一个接口 ResourcePatternResolver ，该接口提供了根据指定的 locationPattern 返回多个资源的策略。其子类 PathMatchingResourcePatternResolver 是一个集大成者的 ResourceLoader ，因为它即实现了 `Resource getResource(String location)` 也实现了 `Resource[] getResources(String locationPattern)` 可以实现批量加载资源。
 

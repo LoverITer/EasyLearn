@@ -57,7 +57,7 @@ public class Main {
 
 下图为 `ClassPathXmlApplicationContext` 的类继承体系结构，虽然只有一部分，但是它基本上包含了 IOC 体系中大部分的核心类和接口。
 
-![](https://www.cmsblogs.com/images/group/sike-java/sike-java-spring-ioc/202105092052551332.png)
+![](http://image.easyblog.top/202105092052551332.png)
 
 下面我们就针对这个图进行简单的拆分和补充说明。
 
@@ -65,17 +65,17 @@ public class Main {
 
 Resource，对资源的抽象，它的每一个实现类都代表了一种资源的访问策略，如ClasspathResource 、 URLResource ，FileSystemResource 等。
 
-![](https://www.cmsblogs.com/images/group/sike-java/sike-java-spring-ioc/202105092051253023.png)
+![](http://image.easyblog.top/202105092051253023.png)
 
 有了资源，就应该有资源加载，Spring 利用 ResourceLoader 来进行统一资源加载，类图如下:
 
-![](https://www.cmsblogs.com/images/group/sike-java/sike-java-spring-ioc/202105092051256374.png)
+![](http://image.easyblog.top/202105092051256374.png)
 
 ### **BeanFactory 体系**
 
 BeanFactory 是一个非常纯粹的 bean 容器，它是 IOC 必备的数据结构，其中 BeanDefinition 是它的基本结构，它内部维护着一个 BeanDefinition Map ，并可根据 BeanDefinition 的描述进行 bean 的创建和管理。
 
-![](https://www.cmsblogs.com/images/group/sike-java/sike-java-spring-ioc/202105092051277805.png)
+![](http://image.easyblog.top/202105092051277805.png)
 
 BeanFacoty 有三个直接子接口： `ListableBeanFactory`、`HierarchicalBeanFactory` 和 `AutowireCapableBeanFactory`，`DefaultListableBeanFactory` 为最终默认实现，它实现了所有接口。
 
@@ -83,13 +83,13 @@ BeanFacoty 有三个直接子接口： `ListableBeanFactory`、`HierarchicalBean
 
 BeanDefinition 用来描述 Spring 中的 Bean 对象。
 
-<img src="https://www.cmsblogs.com/images/group/sike-java/sike-java-spring-ioc/202105092051280866.png" style="zoom:67%;" />
+<img src="http://image.easyblog.top/202105092051280866.png" style="zoom:67%;" />
 
 ### **BeandefinitionReader体系**
 
 BeanDefinitionReader 的作用是读取 Spring 的配置文件的内容，并将其转换成 Ioc 容器内部的数据结构：BeanDefinition。
 
-![](https://www.cmsblogs.com/images/group/sike-java/sike-java-spring-ioc/202105092051283977.png)
+![](http://image.easyblog.top/202105092051283977.png)
 
 ### **ApplicationContext体系**
 
@@ -101,3 +101,4 @@ BeanDefinitionReader 的作用是读取 Spring 的配置文件的内容，并将
 4. **对 Web 应用的支持**。
 
 上面五个体系可以说是 Spring IoC 中最核心的部分，Spring IOC源码系列后续也是针对这五个部分进行源码分析。其实 IoC 咋一看还是挺简单的，无非就是将配置文件（暂且认为是 xml 文件）进行解析（分析 xml 谁不会啊），然后放到一个 Map 里面就差不多了，初看有道理，其实要面临的问题还是有很多的。
+
