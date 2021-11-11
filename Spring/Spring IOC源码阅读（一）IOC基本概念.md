@@ -1,6 +1,6 @@
 ## Spring IOC源码阅读（一）IOC基本概念
 
-`Main.java`
+先看一段熟悉的代码：
 
 ```java
 import org.example.bean.Student;
