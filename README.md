@@ -1,4 +1,4 @@
-<h1 align="center">📚 EasyLearn</h1>
+<h1 align="center" style="border: none">📚 EasyLearn</h1>
 <p align="center">
 <a href=#><img src="https://img.shields.io/badge/Java-%E9%9D%A2%E8%AF%95%E6%8C%87%E5%8D%97-orange"></a>
 <a href="http://image.easyblog.top/16302931798554baf4272-1394-421b-8ea5-f5238fb39db4.jpg"><img src="https://img.shields.io/badge/%E5%85%AC%E4%BC%97%E5%8F%B7-easyblog-green"></a>
