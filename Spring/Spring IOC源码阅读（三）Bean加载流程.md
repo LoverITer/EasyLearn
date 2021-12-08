@@ -86,7 +86,7 @@ public interface BeanDefinitionReader {
 }
 ```
 
-接口有三个重要的实现类：`AbstractBeanDefinitionReader` 以及它的两个子类  `XmlBeanDefinitionReader` 和 `GroovyBeanDefinitionReader`。解析XML文件，程序会选择使用XmlBeanDefinitionReader， 在加载bean时会调用 `loadBeanDefinitions(Resource)`方法，它又会调用另一个真正干活的方法`loadBeanDefinitions(EncodedResource)`：
+接口有三个重要的实现类：`AbstractBeanDefinitionReader` 以及它的两个子类  `XmlBeanDefinitionReader` 和 `GroovyBeanDefinitionReader`。解析XML文件时，程序会选择使用XmlBeanDefinitionReader， 此类加载bean的方法 `XmlBeanDefinitionReader.loadBeanDefinitions(Resource)`定义如下：
 
 ```java
 /**                                                                                                   
@@ -138,9 +138,9 @@ public int loadBeanDefinitions(EncodedResource encodedResource) throws BeanDefin
   * （2.2）resourcesCurrentlyBeingLoaded不存在该资源：
   * （2.2.1）将 encodedResource 加入其中
   * （2.2.2）从 encodedResource 获取封装的 Resource 资源并从 Resource 中获取相应的 InputStream ，
-  * （2.2.3）将 InputStream 封装为 InputSource 调用 `doLoadBeanDefinitions()`。
+  * （2.2.3）将 InputStream 封装为 InputSource 调用 `XmlBeanDefinitionReader.doLoadBeanDefinitions()`真正开始bean的解析过程。
 
-方法 `doLoadBeanDefinitions()` 为从 xml 文件中加载 Bean Definition 的真正逻辑，如下:
+方法 `XmlBeanDefinitionReader.doLoadBeanDefinitions()` 为从 xml 文件中加载 Bean Definition 的真正干活的逻辑，如下:
 
 ```java
 /**                                                                                                      
@@ -185,10 +185,10 @@ protected int doLoadBeanDefinitions(InputSource inputSource, Resource resource)
 
 核心部分就是 try 块的两行代码。
 
-1.  `doLoadDocument()` ：根据 xml 文件获取 Document 实例。
-2. `registerBeanDefinitions()`：根据获取的 Document 实例注册 Bean 实例。 
+* （1）`XmlBeanDefinitionReader.doLoadDocument()` ：根据 xml 文件获取 Document 实例。
+* （2）`XmlBeanDefinitionReader.registerBeanDefinitions()`：根据获取的 Document 实例注册 Bean 实例到IOC容器中。 
 
-其中，`doLoadDocument()`方法内部还获取了 xml 文件的验证模式（`getValidationModeForResource(resource)`）。如下:
+其中，`XmlBeanDefinitionReader.doLoadDocument()`方法内部还获取了 xml 文件的验证模式（`getValidationModeForResource(resource)`）。如下:
 
 ```java
 protected Document doLoadDocument(InputSource inputSource, Resource resource) throws Exception {
@@ -202,3 +202,5 @@ protected Document doLoadDocument(InputSource inputSource, Resource resource) th
 1. 调用 `getValidationModeForResource()` 获取 xml 文件的验证模式 
 2. 调用 `loadDocument()` 根据 xml 文件获取相应的 Document 实例。 
 3.  调用 `registerBeanDefinitions()` 注册 Bean 实例。
+
+到此，对于bean加载流程分析就结束啦！下期[Spring IOC源码阅读（五）注册 BeanDefinition](./Spring IOC源码阅读（五）注册 BeanDefinition)我们将具体分析spring是如何解析并注册bean实例到IOC容器中的。

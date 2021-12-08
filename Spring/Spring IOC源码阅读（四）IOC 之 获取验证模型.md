@@ -6,7 +6,7 @@
 2. 调用 `loadDocument()` 根据 xml 文件获取相应的 Document 实例。
 3. 调用 `registerBeanDefinitions()` 注册 Bean 实例。
 
-这篇博客主要分析获取 xml 文件的验证模式。注册Bean示例我们放到下篇来讲解。
+这篇博客我们插个题外话，先来看看spring是如何分析获取 xml 文件的验证模式的。注册Bean示例我们放到下篇[Spring IOC源码阅读（五）注册 BeanDefinition](./Spring IOC源码阅读（五）注册 BeanDefinition)来讲解。
 
 >  **Q**：什么是xml 文件的验证模式？
 >

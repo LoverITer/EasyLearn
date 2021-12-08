@@ -1,8 +1,10 @@
-## Spring IOC源码阅读（七）解析Bean—解析bean标签
+## Spring IOC源码阅读（七）解析Bean—解析并注册bean
 
 
 
-import 标签解析完毕了，再看 Spring 中最复杂也是最重要的标签 bean 标签的解析过程。 在方法 `parseDefaultElement()` 中，如果遇到标签 为 bean 则调用 `processBeanDefinition()`方法进行 bean 标签解析，如下：
+### 一、解析bean标签获取BeanDefinition
+
+import 标签解析完毕了，再看 Spring 中最复杂也是最重要的标签 bean 标签的解析过程。 在方法 `BeanDefinitionDocumentReader.parseDefaultElement()` 中，如果遇到标签 为 bean 则调用 `BeanDefinitionDocumentReader.processBeanDefinition()`方法进行 bean 标签解析，如下：
 
 ```java
 protected void processBeanDefinition(Element ele, BeanDefinitionParserDelegate delegate) {                
@@ -30,7 +32,7 @@ protected void processBeanDefinition(Element ele, BeanDefinitionParserDelegate d
 * （3）解析完成后，调用 `BeanDefinitionReaderUtils.registerBeanDefiniation` 注册bean
 * （4）发出响应事件，通知相关的监听器已经完成 Bean 标签解析
 
-先看方法 `parseBeanDefinitionElement()`，如下：
+先看方法 `BeanDefinitionParserDelegate.parseBeanDefinitionElement()`，如下：
 
 ```java
 public BeanDefinitionHolder parseBeanDefinitionElement(Element ele, @Nullable BeanDefinition containingBean) {   
@@ -178,4 +180,157 @@ public AbstractBeanDefinition parseBeanDefinitionElement(Element ele, String bea
 
 
 
-未完待续......
+### 二、向IOC容器注册BeanDefinition
+
+`DefaultBeanDefinitionDocumentReader.processBeanDefinition()` 完成 Bean 标签解析的核心工作，如下：
+
+![](img/%E6%88%AA%E5%B1%8F2021-12-07%20%E4%B8%8B%E5%8D%887.09.31.png)
+
+解析工作分为三步：
+
+* 1、解析默认标签；
+* 2、解析默认标签后下得自定义标签；
+* 3、注册解析后的 BeanDefinition。经过前面两个步骤的解析，这时的 BeanDefinition 已经可以满足后续的使用要求了，那么接下来的工作就是将这些 BeanDefinition 进行注册，也就是完成第三步。 注册 BeanDefinition 由 `BeanDefinitionReaderUtils.registerBeanDefinition()` 完成。如下：
+
+![](img/%E6%88%AA%E5%B1%8F2021-12-07%20%E4%B8%8B%E5%8D%887.14.47.png)
+
+
+
+BeanDefinition 的注册由接口 BeanDefinitionRegistry 定义。 `BeanDefinitionRegistry.registerBeanDefinition()` 实现通过 beanName 注册 BeanDefinition的逻辑如下：
+
+```java
+@Override                                                                                               
+public void registerBeanDefinition(String beanName, BeanDefinition beanDefinition)                      
+		throws BeanDefinitionStoreException {                                                           
+  //参数校验                                                                                                      
+	Assert.hasText(beanName, "Bean name must not be empty");                                            
+	Assert.notNull(beanDefinition, "BeanDefinition must not be null");                                  
+                                                                                                        
+	if (beanDefinition instanceof AbstractBeanDefinition) {                                             
+		try { 
+      //主要是对属性 methodOverrides 进行校验
+			((AbstractBeanDefinition) beanDefinition).validate();                                       
+		} catch (BeanDefinitionValidationException ex) {                                                  
+			throw new BeanDefinitionStoreException(beanDefinition.getResourceDescription(), beanName,   
+					"Validation of bean definition failed", ex);                                        
+		}                                                                                               
+	}                                          
+  
+  // 从缓存中获取指定 beanName 的 BeanDefinition 这里的beanDefinitionMap就是所谓的IOC容器                                                                                                     
+	BeanDefinition existingDefinition = this.beanDefinitionMap.get(beanName);                           
+	if (existingDefinition != null) {
+     // 如果存在但是不允许覆盖，抛出异常
+		if (!isAllowBeanDefinitionOverriding()) {                                                       
+			throw new BeanDefinitionOverrideException(beanName, beanDefinition, existingDefinition);    
+		} else if (existingDefinition.getRole() < beanDefinition.getRole()) {                             
+			// e.g. was ROLE_APPLICATION, now overriding with ROLE_SUPPORT or ROLE_INFRASTRUCTURE       
+			if (logger.isInfoEnabled()) {                                                               
+				logger.info("Overriding user-defined bean definition for bean '" + beanName +           
+						"' with a framework-generated bean definition: replacing [" +                   
+						existingDefinition + "] with [" + beanDefinition + "]");                        
+			}                                                                                           
+		} else if (!beanDefinition.equals(existingDefinition)) {  
+       // 覆盖 beanDefinition 与 被覆盖的 beanDefinition 不是同类
+			if (logger.isDebugEnabled()) {                                                              
+				logger.debug("Overriding bean definition for bean '" + beanName +                       
+						"' with a different definition: replacing [" + existingDefinition +             
+						"] with [" + beanDefinition + "]");                                             
+			}                                                                                           
+		} else {                                                                                          
+			if (logger.isTraceEnabled()) {                                                              
+				logger.trace("Overriding bean definition for bean '" + beanName +                       
+						"' with an equivalent definition: replacing [" + existingDefinition +           
+						"] with [" + beanDefinition + "]");                                             
+			}                                                                                           
+		} 
+    // 允许覆盖，直接覆盖原有的 BeanDefinition
+		this.beanDefinitionMap.put(beanName, beanDefinition);                                           
+	} else {     
+     // 检测创建 Bean 阶段是否已经开启，如果开启了则需要对 beanDefinitionMap 进行并发控制
+		if (hasBeanCreationStarted()) {                                                                 
+			// 已经存在beanDefinition创建线程存在了吗，需要进行并发控制         
+			synchronized (this.beanDefinitionMap) {                                                     
+				this.beanDefinitionMap.put(beanName, beanDefinition);                                   
+				List<String> updatedDefinitions = new ArrayList<>(this.beanDefinitionNames.size() + 1); 
+				updatedDefinitions.addAll(this.beanDefinitionNames);                                    
+				updatedDefinitions.add(beanName);                                                       
+				this.beanDefinitionNames = updatedDefinitions;                                          
+				removeManualSingletonName(beanName);                                                    
+			}                                                                                           
+		}	else {                                                                                          
+			// 不会存在并发情况，直接设置：将beanDefiniation放到map中                                                    
+			this.beanDefinitionMap.put(beanName, beanDefinition);                                       
+			this.beanDefinitionNames.add(beanName);                                                     
+			removeManualSingletonName(beanName);                                                        
+		} 
+		this.frozenBeanDefinitionNames = null;                                                          
+	}                                                                                                   
+                                                                                                        
+	if (existingDefinition != null || containsSingleton(beanName)) { 
+    // 重新设置 beanName 对应的缓存
+		resetBeanDefinition(beanName);                                                                  
+	} else if (isConfigurationFrozen()) {                                                                 
+		clearByTypeCache();                                                                             
+	}                                                                                                   
+}                                                                                                       
+```
+
+**核心逻辑如下**：
+
+- （1）首先 BeanDefinition 进行各种校验，该校验也是注册过程中的最后一次校验了，主要是对 AbstractBeanDefinition 的 methodOverrides 属性进行校验
+- （2）根据 beanName 从缓存中获取 BeanDefinition，如果缓存中存在，则根据 allowBeanDefinitionOverriding 标志来判断是否允许覆盖，如果允许则直接覆盖，否则抛出 BeanDefinitionStoreException 异常
+- （3）若缓存中没有指定 beanName 的 BeanDefinition，则判断当前阶段是否已经开始了 Bean 的创建阶段，如果是，则需要对 beanDefinitionMap 进行加锁控制并发问题，否则直接设置即可。对于 `hasBeanCreationStarted()` 方法后续做详细介绍，这里不过多阐述。
+- （4）若缓存中存在该 beanName 或者 单例 bean 集合中存在该 beanName，则调用 `resetBeanDefinition()` 重置 BeanDefinition 缓存。
+
+其实整段代码的核心就在于 `this.beanDefinitionMap.put(beanName, beanDefinition)` 。BeanDefinition 的缓存（IOC）也不是神奇的东西，就是定义了一个key 为 beanName，value 为 BeanDefinition 的 Map。 
+
+**注册 alias**： `BeanDefinitionRegistry.registerAlias` 完成 alias 的注册，如下：
+
+```java
+@Override                                                                                                 
+public void registerAlias(String name, String alias) {  
+  //校验参数
+	Assert.hasText(name, "'name' must not be empty");                                                     
+	Assert.hasText(alias, "'alias' must not be empty");                                                   
+	synchronized (this.aliasMap) {                                                                        
+		if (alias.equals(name)) {  
+      //bean的别名和beanName一样，则从aliasMap中删除此别名
+			this.aliasMap.remove(alias);                                                                  
+			if (logger.isDebugEnabled()) {                                                                
+				logger.debug("Alias definition '" + alias + "' ignored since it points to same name");    
+			}                                                                                             
+		}else {   
+      //bean的别名和beanName不一样，首先根据别名尝试从aliasMap获取此别名
+			String registeredName = this.aliasMap.get(alias);                                             
+			if (registeredName != null) {  
+				if (registeredName.equals(name)) { 
+          //已经存在的别名，不需要重复注册                                       
+					return;                                                                               
+				}                                                                                         
+				if (!allowAliasOverriding()) {  
+          //不允许覆盖冲突的别名，抛出异常
+					throw new IllegalStateException("Cannot define alias '" + alias + "' for name '" +    
+							name + "': It is already registered for name '" + registeredName + "'.");     
+				}                                                                                         
+				if (logger.isDebugEnabled()) {                                                            
+					logger.debug("Overriding alias '" + alias + "' definition for registered name '" +    
+							registeredName + "' with new target name '" + name + "'");                    
+				}                                                                                         
+			}                                                                                             
+			checkForAliasCircle(name, alias);
+      //允许重名的别名重写已存在的别名，在aliasMap中放入新的别名和beanName的映射关系
+			this.aliasMap.put(alias, name);                                                               
+			if (logger.isTraceEnabled()) {                                                                
+				logger.trace("Alias definition '" + alias + "' registered for name '" + name + "'");      
+			}                                                                                             
+		}                                                                                                 
+	}                                                                                                     
+}                                                                                                         
+```
+
+
+
+### 总结
+
+最后来一张时序图，把bean的解析和注册串起来：
+
