@@ -1,10 +1,15 @@
-<h1 align="center" style="border: none">📚 EasyLearn</h1>
 <p align="center">
-<a href=#><img src="https://img.shields.io/badge/Java-%E9%9D%A2%E8%AF%95%E6%8C%87%E5%8D%97-orange"></a>
+    <h1 align="center" style="border: none">📚 EasyLearn</h1>
+    <p align="center">
+       <b>学的不仅仅是技术，更是梦想！</b>
+        <br>
+        <br>
+        <a href=#><img src="https://img.shields.io/badge/Java-%E9%9D%A2%E8%AF%95%E6%8C%87%E5%8D%97-orange"></a>
 <a href="http://image.easyblog.top/16302931798554baf4272-1394-421b-8ea5-f5238fb39db4.jpg"><img src="https://img.shields.io/badge/%E5%85%AC%E4%BC%97%E5%8F%B7-easyblog-green"></a>
 <a href="#"><img src="https://img.shields.io/badge/license-Apache--2.0-blue"></a>
 <a href="https://github.com/LoverITer/EasyLearn/stargazers"><img alt="GitHub stars" src="https://img.shields.io/github/stars/LoverITer/EasyLearn"></a>
 <a href="https://github.com/LoverITer/EasyLearn/network"><img alt="GitHub forks" src="https://img.shields.io/github/forks/LoverITer/EasyLearn"></a>
+    </p>    
 </p>
 
 
