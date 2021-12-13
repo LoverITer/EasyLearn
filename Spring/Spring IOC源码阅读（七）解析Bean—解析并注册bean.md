@@ -282,7 +282,7 @@ public void registerBeanDefinition(String beanName, BeanDefinition beanDefinitio
 - （3）若缓存中没有指定 beanName 的 BeanDefinition，则判断当前阶段是否已经开始了 Bean 的创建阶段，如果是，则需要对 beanDefinitionMap 进行加锁控制并发问题，否则直接设置即可。对于 `hasBeanCreationStarted()` 方法后续做详细介绍，这里不过多阐述。
 - （4）若缓存中存在该 beanName 或者 单例 bean 集合中存在该 beanName，则调用 `resetBeanDefinition()` 重置 BeanDefinition 缓存。
 
-其实整段代码的核心就在于 `this.beanDefinitionMap.put(beanName, beanDefinition)` 。BeanDefinition 的缓存（IOC）也不是神奇的东西，就是定义了一个key 为 beanName，value 为 BeanDefinition 的 Map。 
+其实整段代码的核心就在于 `this.beanDefinitionMap.put(beanName, beanDefinition)` 。BeanDefinition 的缓存也不是神奇的东西，就是定义了一个key 为 beanName，value 为 BeanDefinition 的 Map，这个也即是我们常说的IOC容器。 
 
 **注册 alias**： `BeanDefinitionRegistry.registerAlias` 完成 alias 的注册，如下：
 
@@ -332,5 +332,7 @@ public void registerAlias(String name, String alias) {
 
 ### 总结
 
-最后来一张时序图，把bean的解析和注册串起来：
+最后来一张流程图，把bean的解析和注册串起来：
+
+![](https://www.cmsblogs.com/images/group/sike-java/sike-java-spring-ioc/202105092051533442.png)
 
