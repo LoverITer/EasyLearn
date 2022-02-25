@@ -90,7 +90,7 @@ CREATE KEYSPACE crius_dev WITH replication={'class':'SimpleStrategy','replicatio
 
 下图是键空间的示意图。
 
-![KEYSPACE](https://atts.w3cschool.cn/attachments/tuploads/cassandra/keyspace.jpg)
+![](http://image.easyblog.top/keyspace.jpg)
 
 ##### 列族（column family）
 
@@ -109,13 +109,13 @@ Cassandra column family 具有以下属性 -
 
 **注 -** 与不是固定列族的模式的关系表不同，Cassandra 不强制单个行拥有所有列。下图显示了 Cassandra column family 的示例。
 
-![卡桑德拉柱族](https://atts.w3cschool.cn/attachments/tuploads/cassandra/cassandra_column_family.jpg)
+![](http://image.easyblog.top/cassandra_column_family.jpg)
 
 ##### 列 Column
 
 列是 Cassandra 的基本数据结构，具有三个值，即键或列名称，值和时间戳。下面给出了列的结构。
 
-![卡桑德拉结构柱](https://atts.w3cschool.cn/attachments/tuploads/cassandra/cassandra_structure_of_column.jpg)
+![](http://image.easyblog.top/cassandra_structure_of_column.jpg)
 
 ##### 超级列
 
@@ -123,7 +123,7 @@ Cassandra column family 具有以下属性 -
 
 通常列族被存储在磁盘上的单个文件中。因此，为了优化性能，重要的是保持您可能在同一列族中一起查询的列，并且超级列在此可以有所帮助。下面是超级列的结构。
 
-![卡桑德拉超级列](https://atts.w3cschool.cn/attachments/tuploads/cassandra/cassandra_super_column.jpg)
+![](http://image.easyblog.top/cassandra_super_column.jpg)
 
 ### 三、Cassandra 和 RDBMS 对比
 

@@ -35,7 +35,7 @@ INSERT INTO emp(emp_id,emp_name,emp_city,emp_phone,emp_sal) VALUES (3,'rahman','
 
 插入数据后，使用SELECT语句验证数据是否已插入。如果使用SELECT语句验证emp表，它将给您以下输出。
 
-![](img/%E6%88%AA%E5%B1%8F2022-01-17%20%E4%B8%8B%E5%8D%883.35.57.png)
+![](http://image.easyblog.top/%E6%88%AA%E5%B1%8F2022-01-17%20%E4%B8%8B%E5%8D%883.35.57.png)
 
 
 
@@ -59,7 +59,7 @@ SELECT FROM <tablename>
 
 以下示例显示如何使用SELECT子句读取整个表。这里我们读一个表**emp**。
 
-![](img/%E6%88%AA%E5%B1%8F2022-01-17%20%E4%B8%8B%E5%8D%883.35.57.png)
+![](http://image.easyblog.top/%E6%88%AA%E5%B1%8F2022-01-17%20%E4%B8%8B%E5%8D%883.35.57.png)
 
 
 
@@ -67,7 +67,7 @@ SELECT FROM <tablename>
 
 以下示例显示如何读取表中的特定列。
 
-![](img/%E6%88%AA%E5%B1%8F2022-01-17%20%E4%B8%8B%E5%8D%883.45.27.png)
+![](http://image.easyblog.top/%E6%88%AA%E5%B1%8F2022-01-17%20%E4%B8%8B%E5%8D%883.45.27.png)
 
 
 
@@ -85,7 +85,7 @@ SELECT FROM <table name> WHERE <condition>;
 
 在以下示例中，我们会读取薪水为50000的员工的详细信息。首先，将辅助索引设置为列emp_sal。
 
-![](img/%E6%88%AA%E5%B1%8F2022-01-17%20%E4%B8%8B%E5%8D%883.49.01.png)
+![](http://image.easyblog.top/%E6%88%AA%E5%B1%8F2022-01-17%20%E4%B8%8B%E5%8D%883.49.01.png)
 
 
 
@@ -150,7 +150,7 @@ DELETE emp_sal FROM emp WHERE  emp_id=3;
 
 如下图所示，由于我们删除了rahman的薪资，你将看到一个空值代替薪资。
 
-![](img/%E6%88%AA%E5%B1%8F2022-01-17%20%E4%B8%8B%E5%8D%884.39.18.png)
+![](http://image.easyblog.top/%E6%88%AA%E5%B1%8F2022-01-17%20%E4%B8%8B%E5%8D%884.39.18.png)
 
 #### 删除整行
 
@@ -162,4 +162,4 @@ DELETE FROM emp WHERE emp_id=3;
 
 如下图所示，由于我们删除了最后一行，因此表中只剩下两行
 
-![](img/%E6%88%AA%E5%B1%8F2022-01-17%20%E4%B8%8B%E5%8D%884.42.02.png)
+![](http://image.easyblog.top/%E6%88%AA%E5%B1%8F2022-01-17%20%E4%B8%8B%E5%8D%884.42.02.png)

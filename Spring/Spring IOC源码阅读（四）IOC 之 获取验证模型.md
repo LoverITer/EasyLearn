@@ -133,6 +133,6 @@ public int detectValidationMode(InputStream inputStream) throws IOException {
 
 其实都不用看方法的逻辑，只需要看`XmlValidationModeDetector` 这个类的两个常量就知道大致判断逻辑是什么样的了：
 
-![](img/%E6%88%AA%E5%B1%8F2021-11-30%20%E4%B8%8B%E5%8D%885.08.30.png)
+![](http://image.easyblog.top/%E6%88%AA%E5%B1%8F2021-11-30%20%E4%B8%8B%E5%8D%885.08.30.png)
 
 通过源码注释得知，判断的语句主要是判断文档中是否存在`DOCTYPE` 这个字符串，如果发现这个字符串就认定为DTD，否则就是XSD。知道这一点，再去看源码就会发现代码逻辑还是比较清晰的~~

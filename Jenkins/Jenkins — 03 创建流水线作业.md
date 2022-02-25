@@ -12,7 +12,7 @@
 
 理解流水线的最简单方法是可视化一系列阶段，如下所示：
 
-![](https://pic2.zhimg.com/80/v2-83827703885624ce359a59ab639183e1_1440w.jpg)
+![](http://image.easyblog.top/v2-83827703885624ce359a59ab639183e1_1440w.jpg)
 
 
 
@@ -48,7 +48,7 @@ pipeline {
 
 从示例脚本很容易看到 Jenkins 流水线的结构。如下图所示是Jenkins完整的流水线脚本结构示意图：
 
-<img src="https://upload-images.jianshu.io/upload_images/2916037-4c95c6cfaf3a2bb1.png?imageMogr2/auto-orient/strip|imageView2/2/w/359" style="width:25%;" />
+<img src="http://image.easyblog.top/2916037-4c95c6cfaf3a2bb1.png" style="width:25%;" />
 
 
 
@@ -92,7 +92,7 @@ pipeline{
 - 会自动下载下载并安装我们指定的工具，并将其加入PATH变量中
 - 在全局工具配置(Global Tool Configuration)界面配置工具版本，必须是选择了自动安装
 
-![](https://upload-images.jianshu.io/upload_images/2916037-eabc7cca6b376944.png?imageMogr2/auto-orient/strip|imageView2/2/w/442)
+![](http://image.easyblog.top/2916037-eabc7cca6b376944.png)
 
 **示例**
 
@@ -200,13 +200,13 @@ pipeline {
 
 好。既然你已经了解了 Jenkins 流水线是什么，我将向你展示如何创建和执行 Jenkins 流水线。在本教程的最后，你将建立一个 Jenkins 流水线，如下所示：
 
-![](https://pic4.zhimg.com/80/v2-c234d567676377ff57901445107736e7_1440w.jpg)
+![](http://image.easyblog.top/v2-c234d567676377ff57901445107736e7_1440w.jpg)
 
 ### 2.1 创建一个流水线作业
 
 在此步骤中，你可以选择并定义要创建的 Jenkins 作业类型。选择 “Pipeline” 并为其命名（例如，“TestPipeline”）。单击 “OK” 创建流水线作业。
 
-![](img/%E6%88%AA%E5%B1%8F2021-08-25%20%E4%B8%8B%E5%8D%884.29.48.png)
+![](http://image.easyblog.top/%E6%88%AA%E5%B1%8F2021-08-25%20%E4%B8%8B%E5%8D%884.29.48.png)
 
 你将看到一个 Jenkins 作业配置页面。向下滚动以找到 “Pipeline” 部分。有两种执行 Jenkins 流水线的方法。一种方法是在 Jenkins 上直接编写流水线脚本，另一种方法是从 SCM（源代码管理）中检索 Jenkins 文件。在接下来的两个步骤中，我们将体验这两种方式。
 
@@ -218,7 +218,7 @@ pipeline {
 
 注意 ⚠️  共有三个阶段：Build、Test 和 Deploy，它们是任意的，可以是任何一个。每个阶段中都有一些步骤；在此示例中，它们只是打印一些随机消息。
 
-![](img/%E6%88%AA%E5%B1%8F2021-08-25%20%E4%B8%8B%E5%8D%884.44.37.png)
+![](http://image.easyblog.top/%E6%88%AA%E5%B1%8F2021-08-25%20%E4%B8%8B%E5%8D%884.44.37.png)
 
 单击 “Save” 以保留更改，程序会自动将你带回到 “Job Overview” 页面。
 
@@ -226,11 +226,11 @@ pipeline {
 
 要开始构建流水线的过程，需要单击 “Build Now”。如果一切正常，你将看到如下图所示流水线。
 
-![](img/%E6%88%AA%E5%B1%8F2021-08-25%20%E4%B8%8B%E5%8D%884.47.29.png)
+![](http://image.easyblog.top/%E6%88%AA%E5%B1%8F2021-08-25%20%E4%B8%8B%E5%8D%884.47.29.png)
 
 要查看流水线脚本构建的输出，请单击任何阶段，然后单击 “Log”。你会看到这样的消息。
 
-![](img/%E6%88%AA%E5%B1%8F2021-08-25%20%E4%B8%8B%E5%8D%884.49.54.png)
+![](http://image.easyblog.top/%E6%88%AA%E5%B1%8F2021-08-25%20%E4%B8%8B%E5%8D%884.49.54.png)
 
 
 
@@ -240,15 +240,15 @@ pipeline {
 
 之后回到Jenkins配置页面，滚动到 “Advanced Project Options” 设置，但这一次，从 “Destination” 下拉列表中选择 “Pipeline script from SCM” 选项。将 GitHub 存储库的 URL 粘贴到 “Repository URL” 中，然后在 “Script Path” 中键入 “Jenkinsfile”。 单击 “Save” 按钮保存。
 
-<img src="img/%E6%88%AA%E5%B1%8F2021-08-25%20%E4%B8%8B%E5%8D%884.55.09.png" style="width:67%;" />
+<img src="http://image.easyblog.top/%E6%88%AA%E5%B1%8F2021-08-25%20%E4%B8%8B%E5%8D%884.55.09.png" style="width:67%;" />
 
 要构建流水线，回到 “Task Overview” 页面后，单击 “Build Now” 以再次执行作业。结果与之前相同，除了多了一个称为 “Declaration: Checkout SCM” 的阶段。
 
-![](img/%E6%88%AA%E5%B1%8F2021-08-25%20%E4%B8%8B%E5%8D%884.57.47.png)
+![](http://image.easyblog.top/%E6%88%AA%E5%B1%8F2021-08-25%20%E4%B8%8B%E5%8D%884.57.47.png)
 
 
 
-## 参考资料
+## 参考
 
 * [1] [用 Jenkins 构建 CI/CD 流水线](https://zhuanlan.zhihu.com/p/90612874)
 * [2] [jenkins声明式流水线](https://www.jianshu.com/p/d3ed400d3d4a)

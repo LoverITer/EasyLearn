@@ -2,7 +2,7 @@
 
 
 
-![](https://www.cmsblogs.com/images/group/sike-java/sike-java-spring-ioc/202105092051549271.png)
+![](http://image.easyblog.top/202105092051549271.png)
 
 （此图来自《Spring 揭秘》) Spring IOC 容器所起的作用如上图所示，它会以某种方式加载 Configuration Metadata，将其解析注册到容器内部，然后会根据这些信息绑定整个系统的对象，最终组装成一个可用的基于轻量级容器的应用系统。 Spring 在实现上述功能中，将整个流程分为两个阶段：容器初始化阶段和加载 bean 阶段。
 
@@ -11,7 +11,7 @@
 
 第一个阶段前面（1~7）已经用了大量篇幅进行了深入分析了。所以从这篇开始分析第二个阶段：**加载 bean 阶段**。当我们显示或者隐式地调用 `BeanFactory.getBean()` 时，则会触发加载 bean 阶段。如下：
 
-![](img/%E6%88%AA%E5%B1%8F2021-12-13%20%E4%B8%8B%E5%8D%886.31.12.png)
+![](http://image.easyblog.top/%E6%88%AA%E5%B1%8F2021-12-13%20%E4%B8%8B%E5%8D%886.31.12.png)
 
 方法内部调用 BeanFactory的抽象实现类 AbstractBeanFactory 的 `doGetBean()` 方法，其接受四个参数：
 
@@ -174,7 +174,7 @@ protected <T> T doGetBean(
 
 ####  **1.获取 beanName**
 
-![截屏2021-12-13 下午6.54.33](img/%E6%88%AA%E5%B1%8F2021-12-13%20%E4%B8%8B%E5%8D%886.54.33.png)
+![](http://image.easyblog.top/%E6%88%AA%E5%B1%8F2021-12-13%20%E4%B8%8B%E5%8D%886.54.33.png)
 
 这里调用`doGetBean()`的时候传递的参数 name，不一定就是 beanName，可能是 aliasName，也有可能是 FactoryBean，所以这里需要调用 `transformedBeanName()` 方法对 name 进行一番转换，主要如下：
 
@@ -227,19 +227,19 @@ public String canonicalName(String name) {
 
 #### **2.从单例 bean 缓存中获取 bean**
 
-![](img/%E6%88%AA%E5%B1%8F2021-12-13%20%E4%B8%8B%E5%8D%887.08.10.png)
+![](http://image.easyblog.top/%E6%88%AA%E5%B1%8F2021-12-13%20%E4%B8%8B%E5%8D%887.08.10.png)
 
 我们知道单例模式的 bean 在整个过程中只会被创建一次，第一次创建后会将该 bean 加载到缓存中，后面再获取 bean 就会直接从单例缓存中获取。如果从缓存中得到了 bean，则需要调用 `getObjectForBeanInstance()` 对 bean 进行实例化处理，因为缓存中记录的是最原始的 bean 状态，我们得到的不一定是我们最终想要的 bean。
 
 #### **3.原型模式依赖检查与 parentBeanFactory**
 
-![](img/%E6%88%AA%E5%B1%8F2021-12-13%20%E4%B8%8B%E5%8D%887.12.00.png)
+![](http://image.easyblog.top/%E6%88%AA%E5%B1%8F2021-12-13%20%E4%B8%8B%E5%8D%887.12.00.png)
 
 Spring 只处理单例模式下得循环依赖，对于原型模式下如果出现循环依赖则会直接抛出异常。主要原因还是在于 Spring 解决循环依赖的策略有关。对于单例模式 Spring 在创建 bean 的时候并不是等 bean 完全创建完成后才会将 bean 添加至缓存中，而是不等 bean 创建完成就会将创建 bean 的 ObjectFactory 提早加入到缓存中，这样一旦下一个 bean 创建的时候需要依赖 bean 时则直接使用 ObjectFactroy。但是原型模式我们知道是没法使用缓存的，所以 Spring 对原型模式的循环依赖处理策略则是不处理（关于循环依赖后面会有单独文章说明）。 如果容器缓存中没有相对应的 BeanDefinition 则会尝试从父类工厂（parentBeanFactory）中加载，然后再去递归调用 `getBean()`。
 
 #### **4. 依赖处理**
 
-![](img/%E6%88%AA%E5%B1%8F2021-12-13%20%E4%B8%8B%E5%8D%887.15.23.png)
+![](http://image.easyblog.top/%E6%88%AA%E5%B1%8F2021-12-13%20%E4%B8%8B%E5%8D%887.15.23.png)
 
 每个 bean 都不是单独工作的，它会依赖其他 bean，其他 bean 也会依赖它，对于依赖的 bean ，它会优先加载，所以在 Spring 的加载顺序中，在初始化某一个 bean 的时候首先会初始化这个 bean 的依赖。
 
@@ -314,7 +314,7 @@ Spring  bean 的作用域默认为 `singleton`，当然还有其他作用域，�
 
 ####  **6.类型转换**
 
-![](img/%E6%88%AA%E5%B1%8F2021-12-13%20%E4%B8%8B%E5%8D%887.19.07.png)
+![](http://image.easyblog.top/%E6%88%AA%E5%B1%8F2021-12-13%20%E4%B8%8B%E5%8D%887.19.07.png)
 
 在调用 `doGetBean()` 方法时，有一个 `requiredType` 参数，该参数的功能就是将返回的 bean 转换为 `requiredType` 类型。当然就一般而言我们是不需要进行类型转换的，也就是 requiredType 为空（比如 `getBean(String name)`），但有可能会存在这种情况，比如我们返回的 bean 类型为 String，我们在使用的时候需要将其转换为 Integer，那么这个时候 requiredType 就有用武之地了。当然我们一般是不需要这样做的。
 
