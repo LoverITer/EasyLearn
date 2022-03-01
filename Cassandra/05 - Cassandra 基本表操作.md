@@ -69,7 +69,7 @@ CREATE TABLE emp(
 
 select语句将为您提供模式。使用select语句验证表，如下所示。
 
-![](img/%E6%88%AA%E5%B1%8F2022-01-17%20%E4%B8%8B%E5%8D%882.32.59.png)
+![](http://image.easyblog.top/%E6%88%AA%E5%B1%8F2022-01-17%20%E4%B8%8B%E5%8D%882.32.59.png)
 
 在这里，您可以观察使用给定列创建的表。
 

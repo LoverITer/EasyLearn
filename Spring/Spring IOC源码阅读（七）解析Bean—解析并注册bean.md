@@ -184,7 +184,7 @@ public AbstractBeanDefinition parseBeanDefinitionElement(Element ele, String bea
 
 `DefaultBeanDefinitionDocumentReader.processBeanDefinition()` 完成 Bean 标签解析的核心工作，如下：
 
-![](img/%E6%88%AA%E5%B1%8F2021-12-07%20%E4%B8%8B%E5%8D%887.09.31.png)
+![](http://image.easyblog.top/%E6%88%AA%E5%B1%8F2021-12-07%20%E4%B8%8B%E5%8D%887.09.31.png)
 
 解析工作分为三步：
 
@@ -192,7 +192,7 @@ public AbstractBeanDefinition parseBeanDefinitionElement(Element ele, String bea
 * 2、解析默认标签后下得自定义标签；
 * 3、注册解析后的 BeanDefinition。经过前面两个步骤的解析，这时的 BeanDefinition 已经可以满足后续的使用要求了，那么接下来的工作就是将这些 BeanDefinition 进行注册，也就是完成第三步。 注册 BeanDefinition 由 `BeanDefinitionReaderUtils.registerBeanDefinition()` 完成。如下：
 
-![](img/%E6%88%AA%E5%B1%8F2021-12-07%20%E4%B8%8B%E5%8D%887.14.47.png)
+![](http://image.easyblog.top/%E6%88%AA%E5%B1%8F2021-12-07%20%E4%B8%8B%E5%8D%887.14.47.png)
 
 
 

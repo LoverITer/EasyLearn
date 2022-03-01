@@ -63,7 +63,7 @@ WITH replication ={'calss':'SimpleStrategy','replication_factor' : 1};
 
 在cqlsh命令行可以使用命令 `describe keyspaces;` 查看当前所有的keyspace
 
-<img src="img/%E6%88%AA%E5%B1%8F2022-01-17%20%E4%B8%8B%E5%8D%881.57.33.png" style="zoom:50%;" />
+<img src="http://image.easyblog.top/%E6%88%AA%E5%B1%8F2022-01-17%20%E4%B8%8B%E5%8D%881.57.33.png" style="zoom:50%;" />
 
 在这里可以看到上面使用命令创建的test_sapce空间
 

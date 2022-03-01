@@ -27,7 +27,7 @@
 
 ### 四、策略模式的通用类图
 
-![](https://pic002.cnblogs.com/images/2012/369936/2012011900511269.png)
+![](http://image.easyblog.top/2012011900511269.png)
 
 * **Strategy（抽象策略角色）**：定义了每个算法必须有的算法和属性。
 * **StrategyA/StrategyB...（具体策略角色）**：实现了抽象策略定义的接口。
@@ -114,7 +114,7 @@ public class Main {
 
 运行程序最终打印如下：
 
-![](img/%E6%88%AA%E5%B1%8F2022-02-16%20%E4%B8%8B%E5%8D%887.45.26.png)
+![](http://image.easyblog.top/%E6%88%AA%E5%B1%8F2022-02-16%20%E4%B8%8B%E5%8D%887.45.26.png)
 
 
 

@@ -12,7 +12,9 @@
 
 ## 一、启动cqlsh
 
-在命令行使用命令`cqlsh`启动cqlsh，如下所示。它提供Cassandra cqlsh提示作为输出。![截屏2022-01-17 下午1.34.56](img/%E6%88%AA%E5%B1%8F2022-01-17%20%E4%B8%8B%E5%8D%881.34.56.png)
+在命令行使用命令`cqlsh`启动cqlsh，如下所示。它提供Cassandra cqlsh提示作为输出。
+
+![](http://image.easyblog.top/%E6%88%AA%E5%B1%8F2022-01-17%20%E4%B8%8B%E5%8D%881.34.56.png)
 
 Cqlsh - 如上所述，此命令用于启动cqlsh提示符。此外，它还支持更多的选项。下表说明了cqlsh的所有选项及其用法。
 

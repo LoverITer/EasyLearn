@@ -63,7 +63,7 @@ protected void doRegisterBeanDefinitions(Element root) {
 * （1）程序首先处理 profile属性，profile主要用于我们切换环境，比如切换开发、测试、生产环境等。
 * （2）然后调用 **`BeanDefinitionDocumentReader.parseBeanDefinitions()`** 进行解析动作，不过在该方法前后分别调用 `BeanDefinitionDocumentReader.preProcessXml()` 和 `BeanDefinitionDocumentReader.postProcessXml()` 方法来进行前、后处理，不过这两个方法都是空实现，交由子类来实现进行扩展性配置。
 
-<center><img src="img/%E6%88%AA%E5%B1%8F2021-11-30%20%E4%B8%8B%E5%8D%885.43.57.png" style="width:80%;" /></center>
+<img src="http://image.easyblog.top/%E6%88%AA%E5%B1%8F2021-11-30%20%E4%B8%8B%E5%8D%885.43.57.png" style="width:80%;" />
 
 **注册BeanDefinitions**：`BeanDefinitionDocumentReader.parseBeanDefinitions()` 定义如下：
 
@@ -98,7 +98,7 @@ protected void parseBeanDefinitions(Element root, BeanDefinitionParserDelegate d
 
 *  `BeanDefinitionParserDelegate delegate` ：用于解析 XML Bean 定义的有状态委托类。说白了，这个类里面就存的是xml文件解析之后的元数据，点进去就可以看到类中定义了许多我们熟悉的常量标签字符串：
 
-  ![](img/%E6%88%AA%E5%B1%8F2021-11-30%20%E4%B8%8B%E5%8D%885.51.56.png)
+  ![](http://image.easyblog.top/%E6%88%AA%E5%B1%8F2021-11-30%20%E4%B8%8B%E5%8D%885.51.56.png)
 
 最终解析动作落地在两个方法上：`BeanDefinitionDocumentReader.parseDefaultElement(ele, delegate)` 和 `BeanDefinitionParserDelegate.parseCustomElement(root)`。我们知道在 Spring 有两种 Bean 声明方式：
 
