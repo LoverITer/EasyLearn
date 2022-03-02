@@ -47,5 +47,79 @@
 
 ### 五、代理模式的通用实现
 
-基于代理模式实现一个图片代理：用户访问某大图时不是直接加载该图片，这样会很消耗网络带宽，而是采用先向客户端浏览器加载一个小图，然后在后台加载大图，这样可以大幅度提升用户体验，当然这里只是简单输出一下语句，具体业务逻辑这里不过分纠结~~
+我们平常去电影院看电影的时候，在电影开始的阶段是不是经常会放广告呢？
+
+电影是电影公司委托给影院进行播放的，但是影院可以在播放电影的时候，产生一些自己的经济收益，比如卖爆米花、可乐等，然后在影片开始结束时播放一些广告。
+
+现在用代码来进行模拟。
+
+首先得有一个接口，通用的接口是代理模式实现的基础。这个接口我们命名为 Movie，代表电影播放的能力。
+
+```java
+public interface Movie{
+    void play();
+}
+```
+
+然后，我们要有一个真正的实现这个 Movie 接口的类，和一个只是实现接口的代理类。
+
+```java
+public class RealMovie implements Movie{
+  
+   private String movieName;
+  
+   public RealMovie(String movieName){
+     this.movieName=movieName;
+   }
+
+    @Override
+    public void play(){
+        System.out.println("播放电影:"+movieName);
+    }
+}
+```
+
+这个类实现了Movie接口的play方法，只要调用就可以播放，接下来还需要一个代理类来代理这个”电影“
+
+```java
+public class RealMovieProxy implements Movice{
+  
+    private Movie movie;
+
+    public RealMovieProxy(Movie movie){
+        this.movie=movie;
+    }
+
+    @Override
+    public void play(){
+        System.out.println("电影马上开始了，爆米花、可乐、口香糖9.8折，快来买啊！");
+        System.out.println("播放广告...");
+        movie.play();
+        System.out.println("电影马上结束了，爆米花、可乐、口香糖5折，买回家吃吧！");
+    }
+
+}
+```
+
+这里的RealMovieProxy就是一个代理类它有一个 play() 方法。不过调用 play() 方法时，它对原有的播放电影这件事进行了增强—即插入了广告。现在，测试一下：
+
+```java
+public class Client{
+
+    public static void main(String[] args){
+        RealMovie movie=new RealMovie("速度与激情9");
+        RealMovieProxy proxy=new RealMovieProxy(movie);
+        proxy.play();
+    }
+
+}
+```
+
+执行结果：
+
+![](img/%E6%88%AA%E5%B1%8F2022-03-02%20%E4%B8%8B%E5%8D%886.53.55.png)
+
+从执行的结果可以看到，**代理模式可以在不修改被代理对象的基础上，通过扩展代理类，进行一些功能的附加与增强。值得注意的是，代理类和被代理类应该共同实现一个接口，或者是共同继承某个类。**
+
+上面这种代理方式因为它的类型是我们程序员或接助工具事先预定好的，比如上面代码中的 RealMovieProxy 这个类。所以他被称为**静态代理模式**。其实代理模式真正在生产中使用最多的是**动态代理**，有关内容将在[下一节]()介绍，感兴趣的小伙伴可以追一波~
 

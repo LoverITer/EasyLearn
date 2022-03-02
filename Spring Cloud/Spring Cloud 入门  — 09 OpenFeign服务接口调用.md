@@ -101,15 +101,303 @@ public interface PaymentClient {
 }
 ```
 
-上面的代码中使用到了 `@FeignClient` 注解的 `name` 属性。除此之外，`@FeignClient` 注解的常用属性如下：
-                                             
-* `name`：指定FeignClient的名称，如果项目使用了Ribbon，name属性会作为微服务的名称，用于服务发现
-* `url`: url一般用于调试，可以手动指定@FeignClient调用的地址
-* `decode404`:当发生http 404错误时，如果该字段位true，会调用decoder进行解码，否则抛出FeignException
-* `configuration`: Feign配置类，可以自定义Feign的Encoder、Decoder、LogLevel、Contract
-* `fallback`: 定义容错的处理类，当调用远程接口失败或超时时，会调用对应接口的容错逻辑，fallback指定的类必须实现@FeignClient标记的接口，通常配合服务熔断（Hystrix）进行使用
-* `fallbackFactory`: 工厂类，用于生成fallback类示例，通过这个属性我们可以实现每个接口通用的容错逻辑，减少重复的代码
-* `path`: 定义当前FeignClient的统一前缀
+上面的代码中使用到了 `@FeignClient` 注解的 `name` 属性。除此之外，`@FeignClient` 注解的常用属性如下： 
+
+**（1）value, name**
+
+value和name的作用一样，如果没有配置url那么配置的值将作为服务名称，用于服务发现。反之只是一个名称。
+
+**（2）serviceId**
+
+serviceId已经废弃了，直接使用name即可。
+
+**（3）contextId**
+
+比如我们有个user服务，但user服务中有很多个接口，我们不想将所有的调用接口都定义在一个类中，比如：
+
+Client 1
+
+```less
+@FeignClient(name = "optimization-user")
+public interface UserRemoteClient {
+    @GetMapping("/user/get")
+    public User getUser(@RequestParam("id") int id);
+}
+```
+
+Client 2
+
+```less
+@FeignClient(name = "optimization-user")
+public interface UserRemoteClient2 {
+    @GetMapping("/user2/get")
+    public User getUser(@RequestParam("id") int id);
+}
+```
+
+这种情况下启动就会报错了，因为Bean的名称冲突了，具体错误如下：
+
+```mipsasm
+Description:
+The bean 'optimization-user.FeignClientSpecification', defined in null, could not be registered. A bean with that name has already been defined in null and overriding is disabled.
+Action:
+Consider renaming one of the beans or enabling overriding by setting spring.main.allow-bean-definition-overriding=true
+```
+
+解决方案可以增加下面的配置，作用是允许出现beanName一样的BeanDefinition。
+
+```ini
+spring.main.allow-bean-definition-overriding=true
+```
+
+另一种解决方案就是为每个Client手动指定不同的contextId，这样就不会冲突了。
+
+上面给出了Bean名称冲突后的解决方案，下面来分析下contextId在Feign Client的作用，在注册Feign Client Configuration的时候需要一个名称，名称是通过getClientName方法获取的：
+
+```applescript
+String name = getClientName(attributes);
+
+registerClientConfiguration(registry, name,
+attributes.get("configuration"));
+private String getClientName(Map<String, Object> client) {
+    if (client == null) {
+      return null;
+    }
+    String value = (String) client.get("contextId");
+    if (!StringUtils.hasText(value)) {
+      value = (String) client.get("value");
+    }
+    if (!StringUtils.hasText(value)) {
+      value = (String) client.get("name");
+    }
+    if (!StringUtils.hasText(value)) {
+      value = (String) client.get("serviceId");
+    }
+    if (StringUtils.hasText(value)) {
+      return value;
+    }
+
+
+    throw new IllegalStateException("Either 'name' or 'value' must be provided in @"
+        + FeignClient.class.getSimpleName());
+  }
+```
+
+可以看到如果配置了contextId就会用contextId，如果没有配置就会去value然后是name最后是serviceId。默认都没有配置，当出现一个服务有多个Feign Client的时候就会报错了。
+
+其次的作用是在注册FeignClient中，contextId会作为Client 别名的一部分，如果配置了qualifier优先用qualifier作为别名。
+
+```dart
+private void registerFeignClient(BeanDefinitionRegistry registry,
+      AnnotationMetadata annotationMetadata, Map<String, Object> attributes) {
+    String className = annotationMetadata.getClassName();
+    BeanDefinitionBuilder definition = BeanDefinitionBuilder
+        .genericBeanDefinition(FeignClientFactoryBean.class);
+    validate(attributes);
+    definition.addPropertyValue("url", getUrl(attributes));
+    definition.addPropertyValue("path", getPath(attributes));
+    String name = getName(attributes);
+    definition.addPropertyValue("name", name);
+    String contextId = getContextId(attributes);
+    definition.addPropertyValue("contextId", contextId);
+    definition.addPropertyValue("type", className);
+    definition.addPropertyValue("decode404", attributes.get("decode404"));
+    definition.addPropertyValue("fallback", attributes.get("fallback"));
+    definition.addPropertyValue("fallbackFactory", attributes.get("fallbackFactory"));
+    definition.setAutowireMode(AbstractBeanDefinition.AUTOWIRE_BY_TYPE);
+
+    // 拼接别名
+    String alias = contextId + "FeignClient";
+    AbstractBeanDefinition beanDefinition = definition.getBeanDefinition();
+
+
+    boolean primary = (Boolean) attributes.get("primary"); // has a default, won't be
+                                // null
+
+
+    beanDefinition.setPrimary(primary);
+
+    // 配置了qualifier优先用qualifier
+    String qualifier = getQualifier(attributes);
+    if (StringUtils.hasText(qualifier)) {
+      alias = qualifier;
+    }
+
+
+    BeanDefinitionHolder holder = new BeanDefinitionHolder(beanDefinition, className,
+        new String[] { alias });
+    BeanDefinitionReaderUtils.registerBeanDefinition(holder, registry);
+  }
+```
+
+**（4）url**
+
+url用于配置指定服务的地址，相当于直接请求这个服务，不经过Ribbon的服务选择。像调试等场景可以使用。
+
+**（5）decode404**
+
+当调用请求发生404错误时，decode404的值为true，那么会执行decoder解码，否则抛出异常。
+
+解码也就是会返回固定的数据格式给你：
+
+```json
+{"timestamp":"2020-01-05T09:18:13.154+0000","status":404,"error":"Not Found","message":"No message available","path":"/user/get11"}
+```
+
+抛异常的话就是异常信息了，如果配置了fallback那么就会执行回退逻辑：
+![xxx.png](https://segmentfault.com/img/bVbCpAe)
+
+**（6）configuration**
+
+configuration是配置Feign配置类，在配置类中可以自定义Feign的Encoder、Decoder、LogLevel、Contract等。
+
+configuration定义
+
+```typescript
+public class FeignConfiguration {
+    @Bean
+    public Logger.Level getLoggerLevel() {
+        return Logger.Level.FULL;
+    }
+    @Bean
+    public BasicAuthRequestInterceptor basicAuthRequestInterceptor() {
+        return new BasicAuthRequestInterceptor("user", "password");
+    }
+    
+    @Bean
+    public CustomRequestInterceptor customRequestInterceptor() {
+        return new CustomRequestInterceptor();
+    }
+    // Contract,feignDecoder,feignEncoder.....
+}
+```
+
+使用示列
+
+```less
+@FeignClient(value = "optimization-user", configuration = FeignConfiguration.class)
+public interface UserRemoteClient {
+    
+    @GetMapping("/user/get")
+    public User getUser(@RequestParam("id")int id);
+    
+}
+```
+
+**（7）fallback**
+
+定义容错的处理类，也就是回退逻辑，fallback的类必须实现Feign Client的接口，无法知道熔断的异常信息。
+
+fallback定义
+
+```aspectj
+@Component
+public class UserRemoteClientFallback implements UserRemoteClient {
+    @Override
+    public User getUser(int id) {
+        return new User(0, "默认fallback");
+    }
+    
+}
+```
+
+使用示列
+
+```less
+@FeignClient(value = "optimization-user", fallback = UserRemoteClientFallback.class)
+public interface UserRemoteClient {
+    
+    @GetMapping("/user/get")
+    public User getUser(@RequestParam("id")int id);
+    
+}
+```
+
+**（8）fallbackFactory**
+
+也是容错的处理，可以知道熔断的异常信息。
+
+fallbackFactory定义
+
+```aspectj
+@Component
+public class UserRemoteClientFallbackFactory implements FallbackFactory<UserRemoteClient> {
+    private Logger logger = LoggerFactory.getLogger(UserRemoteClientFallbackFactory.class);
+    
+    @Override
+    public UserRemoteClient create(Throwable cause) {
+        return new UserRemoteClient() {
+            @Override
+            public User getUser(int id) {
+                logger.error("UserRemoteClient.getUser异常", cause);
+                return new User(0, "默认");
+            }
+        };
+    }
+}
+```
+
+使用示列
+
+```less
+@FeignClient(value = "optimization-user", fallbackFactory = UserRemoteClientFallbackFactory.class)
+public interface UserRemoteClient {
+    
+    @GetMapping("/user/get")
+    public User getUser(@RequestParam("id")int id);
+    
+}
+```
+
+**（9）path**
+
+path定义当前FeignClient访问接口时的统一前缀，比如接口地址是/user/get, 如果你定义了前缀是user, 那么具体方法上的路径就只需要写/get 即可。
+
+使用示列
+
+```less
+@FeignClient(name = "optimization-user", path="user")
+public interface UserRemoteClient {
+    
+    @GetMapping("/get")
+    public User getUser(@RequestParam("id") int id);
+}
+```
+
+ **（10）primary**
+
+primary对应的是@Primary注解，默认为true，官方这样设置也是有原因的。当我们的Feign实现了fallback后，也就意味着Feign Client有多个相同的Bean在Spring容器中，当我们在使用@Autowired进行注入的时候，不知道注入哪个，所以我们需要设置一个优先级高的，@Primary注解就是干这件事情的。
+
+**（11）qualifier**
+
+qualifier对应的是@Qualifier注解，使用场景跟上面的primary关系很淡，一般场景直接@Autowired直接注入就可以了。
+
+如果我们的Feign Client有fallback实现，默认@FeignClient注解的primary=true, 意味着我们使用@Autowired注入是没有问题的，会优先注入你的Feign Client。
+
+如果你鬼斧神差的把primary设置成false了，直接用@Autowired注入的地方就会报错，不知道要注入哪个对象。
+
+解决方案很明显，你可以将primary设置成true即可，如果由于某些特殊原因，你必须得去掉primary=true的设置，这种情况下我们怎么进行注入，我们可以配置一个qualifier，然后使用@Qualifier注解进行注入，示列如下：
+
+Feign Client定义
+
+```less
+@FeignClient(name = "optimization-user", path="user", qualifier="userRemoteClient")
+public interface UserRemoteClient {
+    
+    @GetMapping("/get")
+    public User getUser(@RequestParam("id") int id);
+}
+```
+
+Feign Client注入
+
+```less
+@Autowired
+@Qualifier("userRemoteClient")
+private UserRemoteClient userRemoteClient;
+```
+
+   
 
 #### 2.5 提供Controller用于测试
 
@@ -282,6 +570,8 @@ public class CommonFeignConfig {
 
 
 ## 四、OpenFeign 日志打印
+
+
 
 ### 4.1 OpenFeign日志概述
 
