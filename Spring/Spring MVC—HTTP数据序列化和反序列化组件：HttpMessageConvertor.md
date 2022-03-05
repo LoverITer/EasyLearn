@@ -8,11 +8,11 @@ Java Web 开发人员经常要设计 RESTful API ，通过 json 数据进行交�
 
 `org.springframework.http.converter.HttpMessageConverter` 是一个策略接口，源码中对此接口说明如下图所示：
 
-![](img/%E6%88%AA%E5%B1%8F2022-03-01%20%E4%B8%8A%E5%8D%889.46.33.png)
+![](http://image.easyblog.top/%E6%88%AA%E5%B1%8F2022-03-01%20%E4%B8%8A%E5%8D%889.46.33.png)
 
 简单说就是 HTTP request (请求)和 response  (响应)的转换器。该接口有6个方法，简单来说就是获取支持的 MediaType（application/json之类），接收到请求时判断是否能读（canRead），能读则读（read）；返回结果时判断是否能写（canWrite），能写则写（write）。
 
-![截屏2022-03-01 上午9.50.11](img/%E6%88%AA%E5%B1%8F2022-03-01%20%E4%B8%8A%E5%8D%889.50.11.png)
+![](http://image.easyblog.top/%E6%88%AA%E5%B1%8F2022-03-01%20%E4%B8%8A%E5%8D%889.50.11.png)
 
 
 
@@ -124,7 +124,7 @@ public String test(@RequestBody String param) {
 
 同理当执行test方法后，由于返回值标识了`@ResponseBody`，SpringMVC / SpringBoot将使用`StringHttpMessageConverter`的write()方法，将结果作为String值写入响应报文，当然，此时canWrite()方法返回true。借用下图简单描述整个过程：
 
-<img src="https://gimg2.baidu.com/image_search/src=http%3A%2F%2Fgmem.site%2Fwp-content%2Fuploads%2F2012%2F08%2Fhttpconv.png&refer=http%3A%2F%2Fgmem.site&app=2002&size=f9999,10000&q=a80&n=0&g=0n&fmt=jpeg?sec=1648692871&t=96ed4c482be17f5a19ca0d192753cd5b" style="width:87%;" />
+<img src="http://image.easyblog.top/src=http%253A%252F%252Fgmem.site%252Fwp-content%252Fuploads%252F2012%252F08%252Fhttpconv.png&refer=http%253A%252F%252Fgmem.site&app=2002&size=f9999,10000&q=a80&n=0&g=0n&fmt=jpeg" style="width:87%;" />
 
 
 
@@ -154,7 +154,7 @@ mv = ha.handle(processedRequest, response, mappedHandler.getHandler());         
 
 从进入handle之后我将调用栈粘贴在此处：
 
-![](img/%E6%88%AA%E5%B1%8F2022-03-01%20%E4%B8%8A%E5%8D%8811.08.59.png)
+![](http://image.easyblog.top/%E6%88%AA%E5%B1%8F2022-03-01%20%E4%B8%8A%E5%8D%8811.08.59.png)
 
 这里重点说明调用栈最顶层 `readWithMessageConverters` 方法中内容：
 
@@ -239,7 +239,7 @@ protected Object _readMapAndClose(JsonParser p0, JavaType valueType)
 
 还是在上面 `ServletInvocableHandlerMethod` 的 invokeAndHandle 方法中，这次它调用了 `HandlerMethodReturnValueHandlerComposite` 的 handleReturnValue 方法并最终委托给了 `AbstractMessageConverterMethodProcessor` 来处理返回值 
 
-![](img/%E6%88%AA%E5%B1%8F2022-03-01%20%E4%B8%8B%E5%8D%881.28.27.png)
+![](http://image.easyblog.top/%E6%88%AA%E5%B1%8F2022-03-01%20%E4%B8%8B%E5%8D%881.28.27.png)
 
 因此，我们还是重点关注调用栈顶层`writeWithMessageConverters`内容，是不是很熟悉的样子，完全一样的逻辑, 判断是否能写canWrite，能写则write：
 
@@ -299,7 +299,7 @@ private <T> Object processBody(@Nullable Object body, MethodParameter returnType
 
 **`ResponseBodyAdvice`**  它是个接口，根据源码给的注释可以了解到它可以支持让我们在执行了目标控制器handler方法之后，同时在MessageConvertor返回之前自定义响应体。
 
-![](img/%E6%88%AA%E5%B1%8F2022-03-01%20%E4%B8%8B%E5%8D%881.43.27.png)
+![](http://image.easyblog.top/%E6%88%AA%E5%B1%8F2022-03-01%20%E4%B8%8B%E5%8D%881.43.27.png)
 
 这个有什么用呢？我们在设计 RESTful API 接口的时候通常会将返回的数据封装成统一格式，一般常见的实现方式如下：
 
@@ -437,7 +437,7 @@ converters.add(0, new MappingJackson2HttpMessageConverter(){
 
 是的，Spring MVC 的确提供了这个接口：
 
-![](img/%E6%88%AA%E5%B1%8F2022-03-01%20%E4%B8%8B%E5%8D%882.28.22.png)
+![](http://image.easyblog.top/%E6%88%AA%E5%B1%8F2022-03-01%20%E4%B8%8B%E5%8D%882.28.22.png)
 
 `beforeBodyRead` 和 `afterBodyReady` 在`read` 方法调用前后会被调用，`handleEmptyBody` 会在请求体是空时被调用。
 
