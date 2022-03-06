@@ -235,6 +235,8 @@ public class GitHubAuthServiceImpl implements IAuthService<GitHubAuthBean>, IOau
 
 这样做之后前端只需要在请求到链接之后直接将链接设置到登录按钮的href中等待用户点击接口。
 
+
+
 **（2）获取AccessToken**
 
 当用户点击授权之后，GitHub（或其他第三方平台）会回调我们在 redirect_uri 配置的回调地址，在回调方法中我们首先做的事情时带着gitHub 回调时的入参code再次请求github获取accessToken：
@@ -306,7 +308,9 @@ public class GitHubAuthServiceImpl implements IAuthService<GitHubAuthBean>, IOau
 }
 ```
 
-**（4）用户获取成功，将用户保存到系统数据库并让用户登录成功**
+
+
+**（4）回调处理，将用户保存到系统数据库并让用户登录成功**
 
 ```java
 @Slf4j
@@ -349,7 +353,6 @@ public class GitHubAuthServiceImpl implements IAuthService<GitHubAuthBean>, IOau
         return gitHubAuthBean;
     }
 
-
     @Override
     public AuthorizationBean authorize(OauthRequest request) {
         String authorizationUr = String.format("%s?client_id=%s&state=STATE&redirect_uri=%s", gitHubAuthProperties.getAuthorizeUrl(),
@@ -378,7 +381,7 @@ public class GitHubAuthServiceImpl implements IAuthService<GitHubAuthBean>, IOau
 
 
 
-本文所有代码可以在[GitHub仓库](https://github.com/easyblog-org/User)获得，感兴趣的小伙伴可以pull下来研究研究~~
+ok，今天的分享到这里介绍了，感谢大家点赞评论，如有不足之处，还望各位大大批评指正。另外，本文所有代码可以在[GitHub仓库](https://github.com/easyblog-org/User)获得，感兴趣的小伙伴可以pull下来研究研究~~
 
 ### 参考
 
