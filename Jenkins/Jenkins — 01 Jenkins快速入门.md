@@ -44,7 +44,9 @@
 
 ## 二、Jenkins 介绍
 
-Jenkins是一个开源的、界面操作友好的持续集成(CI)工具，起源于Hudson（Hudson是商用的），**主要用于持续、自动的构建/测试软件项目、监控外部任务的运行**。**Jenkins用Java语言编写，可在Tomcat等流行的servlet容器中运行，也可独立运行**。通常与常见的的版本控制工具SVN、GIT以及构建工具Maven、Ant、Gradle结合使用。官网： http://jenkins-ci.org/。
+<img src="https://www.jenkins.io/images/logos/jenkins/jenkins.svg" style="width:10%;" />
+
+Jenkins是一个开源的、界面操作友好的持续集成(CI)工具，起源于Hudson（Hudson是商用的），**主要用于持续、自动的构建/测试软件项目、监控外部任务的运行**。**Jenkins用Java语言编写，可在Tomcat等流行的servlet容器中运行，也可独立运行**。通常与常见的的版本控制工具SVN、GIT以及构建工具Maven、Ant、Gradle结合使用。官网：https://www.jenkins.io/。
 
 **Jenkins的特征**： 
 
@@ -231,7 +233,7 @@ Git也不用过多配置，一般只用配置一下别名就好了
 
 ![](https://image.easyblog.top/27612-20160118223348140-1485606417.png)
 
-注意 ⚠️  上图中红色标1的地方，填写的是本机的ssh私钥证书，红色标2的地方为证书的访问密码，如果未设置证书密码，直接留空，Root Repository Path为远程服务器的上传根目录，hostname即为远程服务器的机器名称（或IP）.
+**注意 ⚠️**  上图中红色标1的地方，填写的是本机的ssh私钥证书，红色标2的地方为证书的访问密码，如果未设置证书密码，直接留空，Root Repository Path为远程服务器的上传根目录，hostname即为远程服务器的机器名称（或IP）.
 
 
 
