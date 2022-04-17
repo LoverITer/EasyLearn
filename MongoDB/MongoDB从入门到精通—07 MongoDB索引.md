@@ -1,7 +1,3 @@
----
-
----
-
 ## MongoDB从入门到精通—07 MongoDB索引
 
 索引支持在MongoDB中高效地执行查询。如果没有索引，MongoDB将有可能采用全集合扫描，即扫描集合中的每个文档（类似MySQL 中的全部扫描），以选择与查询语句 匹配的文档。这种扫描全集合的查询效率是非常低的，特别在处理大量的数据时，查询可以要花费几十秒甚至几分钟，这对网站的性能是非常致命的。
@@ -257,73 +253,6 @@ db.comment.find({"artcile_id":{$in:["10001","10002"]}})
 
 ```shell
 db.comment.find({"article_id":{$in:["10001","10002"]}}).explain()
-```
-
-以上explain执行分析结果如下：
-
-```json
-{
-        "explainVersion" : "1",
-        "queryPlanner" : {
-                "namespace" : "easyblog_dev.comment",
-                "indexFilterSet" : false,
-                "parsedQuery" : {
-                        "article_id" : {
-                                "$in" : [
-                                        "10001",
-                                        "10002"
-                                ]
-                        }
-                },
-                "queryHash" : "498CBB18",
-                "planCacheKey" : "564AC023",
-                "maxIndexedOrSolutionsReached" : false,
-                "maxIndexedAndSolutionsReached" : false,
-                "maxScansToExplodeReached" : false,
-                "winningPlan" : {                 /*重点关注这里*/
-                        "stage" : "COLLSCAN",
-                        "filter" : {
-                                "article_id" : {
-                                        "$in" : [
-                                                "10001",
-                                                "10002"
-                                        ]
-                                }
-                        },
-                        "direction" : "forward"
-                },
-                "rejectedPlans" : [ ]
-        },
-        "command" : {
-                "find" : "comment",
-                "filter" : {
-                        "article_id" : {
-                                "$in" : [
-                                        "10001",
-                                        "10002"
-                                ]
-                        }
-                },
-                "$db" : "easyblog_dev"
-        },
-        "serverInfo" : {
-                "host" : "iZbp195ve61zmmqydk0z96Z",
-                "port" : 27017,
-                "version" : "5.0.7",
-                "gitVersion" : "b977129dc70eed766cbee7e412d901ee213acbda"
-        },
-        "serverParameters" : {
-                "internalQueryFacetBufferSizeBytes" : 104857600,
-                "internalQueryFacetMaxOutputDocSizeBytes" : 104857600,
-                "internalLookupStageIntermediateDocumentMaxSizeBytes" : 104857600,
-                "internalDocumentSourceGroupMaxMemoryBytes" : 104857600,
-                "internalQueryMaxBlockingSortMemoryUsageBytes" : 104857600,
-                "internalQueryProhibitBlockingMergeOnMongoS" : 0,
-                "internalQueryMaxAddToSetBytes" : 104857600,
-                "internalDocumentSourceSetWindowFieldsMaxMemoryBytes" : 104857600
-        },
-        "ok" : 1
-}
 ```
 
 
