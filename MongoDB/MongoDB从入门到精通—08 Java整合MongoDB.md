@@ -839,7 +839,7 @@ public class CommentService {
 
 【**示例2**】
 
-多条件复杂查询：
+多字段更新：
 
 ```java
 package com.example.mongodb.service;
