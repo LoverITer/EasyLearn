@@ -74,10 +74,10 @@ setParameter:
 
 更多详细配置项内容可以参考官方文档：https://docs.mongodb.com/manual/reference/configuration-options/
 
-配置完成之后同样在mongoDB的bin目录下执行如下如下命令：
+配置完成之后同样在mongoDB bin 目录下执行如下命令：
 
 ```shell
-mongod -f ..\conf\mongod.conf
+mongod -f ../conf/mongod.conf
 ```
 
 ![QQ截图20220412211117](http://image.easyblog.top/QQ%E6%88%AA%E5%9B%BE20220412211117.png)
