@@ -220,3 +220,170 @@ Switch 语句细节：
 
 
 ## for循环控制
+
+
+
+### for语句
+
+Go语言中的所有循环操作均可使用for关键字来完成
+
+**基本语法**
+
+```go
+for 初始语句; 条件表达式; 结束语句 {
+  
+	循环体
+  
+}
+```
+
+条件表达式返回true时循环体不停地进行循环，直到条件表达式返回false时自动退出循环
+
+
+
+实例：打印1~100
+
+```go
+package main
+
+import "fmt"
+
+func main() {
+
+	for i:=1;i<=100;i++{
+		fmt.Printf("%v\t",i)
+	}
+
+}
+```
+
+
+
+注意，**在Go语言中，没有while语句，我们可以通过for来代替**
+
+```go
+package main
+
+import "fmt"
+
+func main() {
+
+	// while
+	index := 1
+	for {
+		if index <=100 {
+			fmt.Printf("%v\t", index)
+			index++
+			continue
+		}
+		break
+	}
+}
+```
+
+for循环可以通过break、goto、return、panic语句退出循环
+
+
+
+### for-range 语句
+
+Go提供for-range的方式，可以方便遍历字符串和数组。
+
+（1）传统方式遍历字符串
+
+```go
+package main
+
+import "fmt"
+
+func main() {
+	// for-range
+	str :="hello world"
+	for index:=0;index<len(str);index++{
+		fmt.Printf("%c\t",str[index])
+	}
+}
+```
+
+使用这种方式遍历字符串，如果字符串中包含有在ASCII字符串之外的字符的话就会乱码，所以我们可以使用for-range来安全的遍历字符串。
+
+（2）for-range方式遍历
+
+* for-range遍历字符串
+
+```go
+package main
+
+import "fmt"
+
+func main() {
+	str2 :="你好，这里是Go的世界！"
+	for index,ch:=range str2{
+		fmt.Printf("%v-%c\t",index,ch)
+	}
+}
+```
+
+
+
+* 使用for-range遍历数组
+
+```go
+package main
+
+import "fmt"
+
+func main() {
+	// for-range遍历数组
+	var arr = []string{"php", "java", "c++", "golang"}
+	for index, val := range arr {
+		fmt.Printf("%v,%v\n", index, val)
+	}
+}
+```
+
+
+
+
+
+## goto语句
+
+goto 语句通过标签进行代码间的无条件跳转。goto 语句可以在快速跳出循环、避免重复退出上有一定的帮助。Go语言中使用goto语句能简化一些代码的实现过程。
+
+基本语法
+
+```go
+goto lable
+......
+lable: statement
+```
+
+
+
+**Demo**
+
+```go
+package main
+
+import "fmt"
+
+func main() {
+	var age int32
+	fmt.Scanln(&age)
+
+	if age>18{
+		fmt.Println("成年人")
+	}else {
+		goto lable1
+	}
+
+	fmt.Println("aaa")
+	fmt.Println("bbb")
+lable1:
+	fmt.Println("ccc")
+	fmt.Println("ddd")
+}
+```
+
+
+
