@@ -1,4 +1,4 @@
-Golang的切片
+# Golang的切片
 
 
 
@@ -346,7 +346,7 @@ func main() {
 
 
 	var strs=[]string{"banana","apple","orange","cherry"}
-	// 按照自然顺序排列
+	// 按照自然顺序排列，输出 [apple banana cherry orange]
 	sort.Strings(strs)
 	fmt.Println(strs)
 }
