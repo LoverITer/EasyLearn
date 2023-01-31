@@ -69,3 +69,64 @@ func main() {
 }
 ```
 
+
+
+##  遍历map
+
+### 基本的遍历方式
+
+Map可以使用for range遍历
+
+```go
+package main
+
+import "fmt"
+
+func main() {
+
+  // 创建map
+	var orderIdMap = map[int]string{
+		1: "6123000333113",
+		2: "6123000333114",
+		3: "6123000333115",
+		4: "6123000333116",
+		5: "6123000333117",
+	}
+
+	// for-range 遍历map
+	for key,value:=range orderIdMap{
+		fmt.Printf("key:%v,value:%v\n",key,value)
+	}
+}
+```
+
+**注意：Map遍历的时候元素的顺序是随机的**
+
+
+
+### 在遍历中增加元素
+
+在遍历的同时增加元素，增加的元素是可以被遍历到的
+
+```go
+package main
+
+import "fmt"
+
+func main() {
+	var orderIdMap = map[int]string{
+		1: "6123000333113",
+		2: "6123000333114",
+		3: "6123000333115",
+		4: "6123000333116",
+		5: "6123000333117",
+	}
+
+	// for-range 遍历map
+	for key,value:=range orderIdMap{
+		orderIdMap[6]="6123000333118"
+		fmt.Printf("key:%v,value:%v\n",key,value)
+	}
+}
+```
+
