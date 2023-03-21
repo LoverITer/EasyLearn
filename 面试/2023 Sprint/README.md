@@ -244,3 +244,132 @@ public Object doAround(ProceedingJoinPoint pjp) throws Throwable {
 
 
 
+## 1.4 异常
+
+### Java异常体系？
+
+![](https://cdn.learnku.com/uploads/images/202107/12/83656/9unTT81Zpt.png!large)
+
+Java将系统的所有异常包装成对应的异常类型（对象），所有异常的基类是 `Throwable`，又分为 `Error`  和 `Exception` 两大子异常类型。
+
+* Error
+
+  Error 是有JVM虚拟机抛出来的异常，描述的系统内部的一些崩溃，例如Java虚拟机崩溃。这种情况仅凭程序自身是无法处理的，在程序中也不会对Error异常进行捕捉和抛出，常见的Error：`OutOfMemoryError、StackOverflowError
+
+* Excetion
+
+  Exception 是在程序中可以处理的异常，又分为 `Checked Exception` 和 `RuntimeException` 两类异常。
+
+  * Checked Exception 是一类受检查的异常，这类异常是必须显式解决的，如果不解决就会出现编译异常，常见的受检查异常比如：`IOException`、`SQLException`、`FileNotFoundException`....
+  * RuntimeException 是运行时异常，是在代码运行过程中发生的异常，一般是是代码错误引起的异常，程序中可以处理显式这些异常，也可以不处理。常见的的运行时异常如：`NullPointerException`、`ClassCastException`、`ClassNotFoundException`、`ArrayIndexOutOfBoundException`、`ArithmeticException`
+
+
+
+### 关键字 throw 和 throws 的区别
+
+* throws 用于申明异常，如果一个受检查异常没有在方法中被处理，那么必须使用throws来申明异常，throws 关键字放在方法签名的尾部，eg：
+
+  ```java
+  public void doSometing() throws IOException{
+  
+  
+  }
+
+* throw 用于在代码关键节点数据状态非法，程序无法继续向下执行时手动抛出异常
+
+  ```java
+  public void doSometing(boolean status) {
+  
+    if(!status){
+      throw new IllegalArgumentException("参数异常");
+    }
+  
+    ...deal biz
+  }
+  ```
+
+  
+
+###  try-with-resource？
+
+try-with-resources 是 Java7 映引入的一个特性，它可以管理实现了`AutoCloseable`接口的资源实现自动关闭资源操作，当程序try块执行完成之后，会帮助我们自动关闭资源而不再需要我们手动显式的关闭资源。
+
+```java
+public void doSometing(File file){
+  
+  try(
+     FileInputStream fis=new FileInputStream(file);
+     FileOutputStream fos=new FileOutputStream(file);
+  ){
+    //deal biz...
+  }catch(IOException e){
+    //deal exception...
+  }
+  
+}
+```
+
+
+
+
+
+### 异常底层原理？
+
+* 代码层面
+
+  代码层面，异常的实现原理就和**责任链模式**类似，当发生异常后异常会沿着调用栈一直往上抛，直到遇到可以处理此异常的地方，直到抛到main还没被处理则停止继续往上抛，JVM会将程序终止并打印调用栈。
+
+* JVM层面
+
+  JVM层面的实现原理我们需要深入字节码，如果一段代码中包含try-catch块，则编译器在编译的时候会给这段代码的字节码生成一个`异常表（Exception Table）`,异常表里记录了从哪一行到哪一行发生异常后跳转到哪一行处理的详细逻辑。如下是一个例子：
+
+  ```java
+  public static void simpleTryCatch() {
+     try {
+         testNPE();
+     } catch (Exception e) {
+         e.printStackTrace();
+     }
+  }
+  ```
+
+  编译如上代码获得class文件后使用javap来分析这段代码
+
+  ```java
+  //javap -c Main
+   public static void simpleTryCatch();
+      Code:
+         0: invokestatic  #3                  // Method testNPE:()V
+         3: goto          11
+         6: astore_0
+         7: aload_0
+         8: invokevirtual #5                  // Method java/lang/Exception.printStackTrace:()V
+        11: return
+      Exception table:
+         from    to  target type
+             0     3     6   Class java/lang/Exception
+  ```
+
+  在上面代码中可以看到 Exception table，异常表中包含了一个或多个异常处理者(Exception Handler)的信息，这些信息包含如下：
+
+  - **from** 可能发生异常的起始点
+  - **to** 可能发生异常的结束点
+  - **target** 上述from和to之前发生异常后的异常处理者的位置
+  - **type** 异常处理者处理的异常的类信息
+
+> Exception table:
+>        from    to  target type
+>            0     3     6   Class java/lang/Exception
+>
+> 所以如上异常表的含义就是：第0~3行可能会发生异常，当发生异常后跳转到第6行处理，异常类型是 java.lang.Exception
+
+
+
+## 1.5 反射
+
+### 什么是反射？
+
+**反射是Java提供的一种机制，利用这种机制我们可以在程序运行的时候动态获取类的信息，访问和操作类的属性、方法和构造器，利用反射还可以在运行时动态实例化对象、调用方法以及修改属性值等操作。反射机制给Java程序的编写提供了极大的灵活性，但是也需要更高的运行时开销**。
+
+
+
