@@ -562,4 +562,109 @@ Java 有三种类型的集合：`List`、`Set` 和 `Queue`：
 
 ArrayList 实现了List 接口，是一个基于数组实现的动态数组，程序可以在运行过程中动态的添加或删除元素，并根据需要自动调整容器容量大小。
 
-ArrayList 底层数据结构是一个 **Object 数组**，数组**默认容量是10**，在默认构造方法中，ArrayList采用了类似懒加载的机制，当我们`new ArrayList()`之后底层的Object数组实际没有被初始话出来，真正初始化只在第一次调用add方法添加元素时初始化的。
+ArrayList 底层数据结构是一个 **Object 数组**，数组**默认容量是10**，在默认构造方法中，ArrayList采用了类似懒加载的机制，当我们`new ArrayList()`之后底层的Object数组实际没有被实例化出来，真正实例化是在第一次调用add方法添加元素时初始化的。
+
+
+
+### ArrayList扩容机制？
+
+当我们向ArrayList中添加元素时会首先检查数组大小是否够用，如果不够用则会扩容，**默认的扩容大小是原数组的`1.5倍`，如果扩容1.5的大小还是没法满足添加元素所需的容量，就会使用传入的容量大小**。具体扩容机制如图：
+
+![](http://image.easyblog.top/1679497843993519f67bb-e051-4b6e-9c0e-8a178c0a31f0.png)
+
+
+
+### Vector （ 数组实现、 线程同步）
+
+`Vector` 与 `ArrayList` 一样，也是通过数组实现的，不同的是**它支持线程安全的，即某一时刻只有一 个线程能够写 Vector，避免多线程同时写而引起的不一致性，但实现同步需要很高的花费，因此， 访问它比访问 ArrayList 慢**。
+
+
+
+### LinkedList（双链表、双端队列
+
+`LinkedList` 即实现了List接口，同时它也实现了Deque接口。它**使用链表结构存储数据，很适合数据的动态插入和删除。**具体的我们看看源码就清楚了：
+
+![](http://image.easyblog.top/1679498607465c14aa86d-e75d-484a-a291-756f5c510ccd.png)
+
+有两个Node类型的引用 first 和 last 分别指向链表的头和尾元素，Node类型的定义如下：
+
+![](http://image.easyblog.top/1679498734102f7ca1841-c33b-413e-a0ec-2a34bd0456ed.png)
+
+Node 类型的定义是一个典型的双链表的树结构样式，有一个`next引用指向下一个元素`，`prev引用指向上一个元素`，同时每个节点中都有一个元素 `item`
+
+
+
+### ArrayList和LinkedList的区别？
+
+1、ArrayList的实现是基于数组（可以动态扩容的数组），LinkedList的实现是基于双向链表。
+
+2、对于随机访问，ArrayList优于LinkedList
+
+3、对于插入和删除操作，LinkedList优于ArrayList
+
+4、LinkedList比ArrayList更占内存，因为LinkedList的节点除了存储数据，还存储了两个引用，一个指向前一个元素，一个指向后一个元素。的效率更高，因为ArrayList是数组，所以在其中进行增删操作时，会对操作点之后所有数据的下标索引造成影响，需要进行数据的移动。
+
+
+
+### 安全失败机制（fail-safe）和快速失败机制（fail-fast）
+
+#### 快速失败机制 fail-fast
+
+* **是什么？**
+
+  **fail-fast是java集合的一种错误检测机制，在遍历集合的时候当对集合的结构进行修改（删除、增加）的时候，就会触发fail-fast。表现形式就是会抛出`ConcurrentmodificationException`异常**。
+
+![](http://image.easyblog.top/1595933610575c4da05ab-05d7-4aca-95c6-9890668f4daf.png)
+
+* **原理**
+
+  **迭代器在遍历时直接访问集合中的内容，并且在遍历过程中使用一个int类型的变量modCount统计修改的次数，他表示的是集合在遍历之前已经修改过的次数，每当删除或添加元素之后都会把modCount+1，此时当调用hasNext()/next()方法时会判断modCount和exceptedModCount的值是否相等，如果相等就返回继续遍历，否则抛出ConcurrentModificationException，终止遍历。**
+
+* **应用场景**
+
+  java.util包下的集合类都使用了这种机制（Hashtable除外，它使用的是fail-safe）,不能在多线程下发生并发修改（迭代过程中被修改）算是一种安全机制吧。
+
+* **如何避免快速失败机制/如何在遍历中增加或删除元素？**
+
+  * （1）使用**iterator**遍历同时加上锁同步
+  * （2）**使用线程安全的容器**，比如ArrayList 的替代是 `CopyOnWriteArrayList`
+
+#### 安全失败机制 fail-safe
+
+* **是什么？**
+
+  **采用安全失败机制的集合容器，在遍历的时候不会直接在原来的内容量上遍历，而是复制一份在副本上遍历。由于遍历是在拷贝的副本上进行的，所以在遍历过程中对原集合所作的修改并不能被迭代器检测到，因此不会引发`ConcurrentmodificationException`**
+
+* **应用场景**
+
+  J.U.C包下都是安全失败机制容器，可以在多线程环境下并发的修改和访问
+
+* **缺点**
+
+  基于拷贝内容的优点是避免了Concurrent Modification Exception，但同样地，迭代器并不能访问到修改后的内容，即：迭代器遍历的是开始遍历那一刻拿到的集合拷贝，在遍历期间原集合发生的修改迭代器是不知道的。
+
+### HashMap的数据结构？
+
+
+
+
+
+### HashMap put 方法流程？
+
+
+
+
+
+### HashMap get 方法流程？
+
+
+
+
+
+### HashMap 扩容机制？
+
+
+
+
+
+### 1.7版本HashMap的线程安全问题？
