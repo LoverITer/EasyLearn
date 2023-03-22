@@ -373,3 +373,168 @@ public void doSometing(File file){
 
 
 
+### Class Signature 保留泛型信息？
+
+Q：Java中泛型在编译的类型会被擦除，为什么使用反射还是可以获取到泛型类型？
+
+A：网上比较靠谱的回答：https://wiyi.org/type-erasure.html
+
+总结：**当类的泛型信息被填写了实际的类型信息，这些类型信息会在编译时被记录在class signature**。比如下面例子：
+
+```java
+public class UserRepository implements CrudRepository<User> {
+
+    private final LinkedList<User> users = new LinkedList<User>();
+
+    @Override
+    public User find() {
+        return users.getFirst();
+    }
+
+    @Override
+    public void add(User user) {
+        users.add(user);
+    }
+
+    @Override
+    public boolean contain(User user) {
+        return users.contains(user);
+    }
+}
+```
+
+UserRepository实现了CrudRepository接口，且指定类型为User，这些类型在编译时就会被编码。看看字节码。
+
+```java
+//...忽略上面的
+{
+  public java.io.Serializable find();
+    descriptor: ()Ljava/io/Serializable;
+    flags: ACC_PUBLIC, ACC_BRIDGE, ACC_SYNTHETIC
+    Code:
+      stack=1, locals=1, args_size=1
+         0: aload_0
+         1: invokevirtual #11                 // Method find:()Lorg/wiyi/generic/domain/User;
+         4: areturn
+      LineNumberTable:
+        line 8: 0
+      LocalVariableTable:
+        Start  Length  Slot  Name   Signature
+            0       5     0  this   Lorg/wiyi/generic/UserRepository;
+}
+Signature: #37                          // Ljava/lang/Object;Lorg/wiyi/generic/CrudRepository<Lorg/wiyi/generic/domain/User;>;
+SourceFile: "UserRepository.java"
+```
+
+
+
+这里Class Signature上明确包含了泛型的实际类型，这种情况下计算存在泛型擦除，我们也可以使用反射获取到泛型的实际类型。JDK提供了2个方法获取Class的Signature，分别是:
+
+```java
+Class.getGenericInterfaces();
+Class.getGenericSuperclass();
+```
+
+
+
+### 反射的使用？
+
+* Class获取类信息
+
+  ```java
+   @Test                                                                    
+   public void classTest() throws Exception {                               
+       // 获取Class对象的三种方式                                                    
+       System.out.println("根据类名:  \t" + User.class);                        
+       User user = new User();                                              
+       System.out.println("根据对象:  \t" + user.getClass());                   
+       System.out.println("根据全限定类名:\t" + Class.forName("org.example.User"));
+       // 常用的方法                                                             
+       Class<? extends User> userClass = user.getClass();                   
+       System.out.println("获取全限定类名:\t" + userClass.getName());              
+       System.out.println("获取类名:\t" + userClass.getSimpleName());           
+       System.out.println("实例化:\t" + userClass.newInstance());              
+   }                                                                        
+  ```
+
+  
+
+* Constructor获取并操作构造器
+
+  ```java
+  //todo
+  ```
+
+  
+
+* Field获取并操作属性
+
+  ```java
+   @Test                                                                                                                             
+   public void fieldTest() throws IllegalAccessException {                                                                           
+       User user = new User("张三", "Test address", 20);                                                                               
+       Class<? extends User> userClass = user.getClass();                                                                            
+       // 获取成员变量                                                                                                                     
+       Field[] fields = userClass.getDeclaredFields();                                                                               
+       for (Field field : fields) {                                                                                                  
+           // 私有成员变量需要"暴力"访问                                                                                                         
+           field.setAccessible(true);                                                                                                
+                                                                                                                                     
+           // 获取成员变量名和值                                                                                                              
+           System.out.println(field.getName()+"="+field.get(user));                                                                  
+       }                                                                                                                             
+                                                                                                                                     
+       Optional<Field> fieldOptional = Arrays.stream(fields).filter(field -> StringUtils.equals(field.getName(), "name")).findAny(); 
+       fieldOptional.ifPresent((field)->{                                                                                            
+           try {                                                                                                                     
+               // 操作属性设置值                                                                                                            
+               field.set(user,"李四");                                                                                                 
+           } catch (IllegalAccessException e) {                                                                                      
+               throw new RuntimeException(e);                                                                                        
+           }                                                                                                                         
+       });                                                                                                                           
+       System.out.println(user);                                                                                                     
+   }                                                                                                                                                                                           
+  ```
+
+  
+
+* Method获取并操作方法
+
+  ```java
+   @Test                                                                                                                                       
+   public void methodTest(){                                                                                                                   
+       User user = new User("张三", "Test address", 20);                                                                                         
+       Class<? extends User> userClass = user.getClass();                                                                                      
+       // 获取成员方法                                                                                                                               
+       Method[] declaredMethods = userClass.getDeclaredMethods();                                                                              
+       for (Method method : declaredMethods) {                                                                                                 
+           System.out.println("方法名："+method.getName());                                                                                        
+           System.out.println("方法入参："+Arrays.toString(method.getParameters()));                                                                
+           System.out.println("方法修饰符："+ Modifier.toString(method.getModifiers()));                                                             
+           System.out.println("方法返回值："+method.getReturnType());                                                                                
+           System.out.println("==========================");                                                                                   
+       }                                                                                                                                       
+                                                                                                                                               
+       // 通过反射调用方法                                                                                                                             
+       Optional<Method> toString = Arrays.stream(declaredMethods).filter(method -> StringUtils.equals(method.getName(), "toString")).findAny();
+       toString.ifPresent(method -> {                                                                                                          
+           Object invoke = null;                                                                                                               
+           try {   
+               // invoke 反射调用方法
+               invoke = method.invoke(user, null);                                                                                             
+           } catch (IllegalAccessException | InvocationTargetException e) {                                                                    
+               throw new RuntimeException(e);                                                                                                  
+           }                                                                                                                                   
+           System.out.println(invoke);                                                                                                         
+       });                                                                                                                                     
+   }                                                                                                                                           
+  ```
+
+  
+
+
+
+# 二、Java集合
+
+## 2.1 Collection
