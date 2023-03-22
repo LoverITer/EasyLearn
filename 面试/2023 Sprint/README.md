@@ -373,3 +373,36 @@ public void doSometing(File file){
 
 
 
+
+
+
+
+# 二、Java集合
+
+Java 容器分为 `Collection` 和 `Map` 两大类，Collection 集合的子接口有 `List`、`Set` 和 `Queue`三种子接口。我们比较常用的是Set、List，**Map接口不是Collection的子接口**。
+
+## 2.1 Java的集合体系
+
+### 介绍集合体系？
+
+Java 有三种类型的集合：`List`、`Set` 和 `Queue`：
+
+* **List**
+
+  List 是一种**元素有序且元素可能重复的容器**，有序是指**元素存入集合的顺序和取出的顺序一致**，重复是指在List集合中元素时可以重复出现的，元素可以为null，常见的List集合容器实现：ArrayList、LinkedList、Vector....
+
+* **Set**
+
+  Set是一种**元素无序且元素不重复的容器**，无序是指元素存入集合的顺序和取出的顺序可能不一致，不重复是指Set集合中元素不能重复粗周年，Set集合中元素也可以为null，常见的Set集合容器实现：HashSet、TreeSet、LinkedHashSet...
+
+* **Queue**
+
+  Queue 是一种**先进先出（FIFO）数据结构（队列）**，Queue 接口常见的实现有：LinkedList（一个基于链表实现的队列）、PriorityQueue（一个基于堆实现的优先级队列）、ArrayDeque（一个基于数组实现的双端队列）
+
+
+
+### ArrayList的底层？
+
+ArrayList 实现了List 接口，是一个基于数组实现的动态数组，程序可以在运行过程中动态的添加或删除元素，并根据需要自动调整容器容量大小。
+
+ArrayList 底层数据结构是一个 **Object 数组**，数组**默认容量是10**，在默认构造方法中，ArrayList采用了类似懒加载的机制，当我们`new ArrayList()`之后底层的Object数组实际没有被初始话出来，真正初始化只在第一次调用add方法添加元素时初始化的。
