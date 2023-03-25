@@ -837,3 +837,39 @@ jdk1.8扩容关键逻辑，if 分支上面的代码主要是确定下来新的�
 - 如果哈希表不空，就会计算key的桶位下标`table[(n-1)&hash]`，如果对应桶位元素为null会直接返回null；
 - 如果哈希表不为空并且key在HashMap中存在，那就首先检查一下hash表中的这个元素是不是要找的值（判定的标准是equals方法返回true），如果是就直接返回vlaue,如果不是还会在判断一下是否存在后继结点，如果不存在直接返回null
 - 如果存在后继结点，那么首先判断一下是红黑树还是链表，如果是红黑树那就到红黑树中取值，如果是链表那就从头开始遍历链表找到值后返回。
+
+
+
+
+
+### Hashtable如何实现？
+
+Hashtable 是 jdk1.0 开始就支持的哈希表实现，Java 2 重构的Hashtable实现了Map接口，因此，Hashtable现在集成到了集合框架中。与HashMap相比hashtable的差异点有以下几点：
+
+* `Null key & Null value`：HashMap的key 和 value 都支持可以为null，而HashTable在遇到null时，会抛出NullPointerException 异常
+
+* `线程安全性`:HashMap不是线程安全的，Hashtable是线程安全的，因为他的所有共有方法都是用`synchronized`关键字进行了同步
+
+* HashMap 把 Hashtable 的 `contains` 方法去掉了，改成 `containsValue` 和 `containsKey`。因为 `contains` 方法容易让人引起误解。
+
+* Hashtable的默认初始化大小是11，而HashMap的默认初始化大小是 16
+
+* 当发生哈希冲突是 Hashtable 也采用了头插链表的方式插入新元素和jdk1.7之前的HasjMap方式类似，但是HashMap 在 jdk1.8 之后采用了尾插法。
+
+* 哈希值和桶下边的计算方式不同，Hashtable 是取模运算，HashMap 是位运算，后者效率更高。
+
+  * Hashtable 的计算方式是：
+
+    ```java
+    hash=key.hashCode()
+    index=(hash & 0x7FFFFFFF) % tab.length  // 采用的是对哈希数组容量取模的方式获取下标 
+    ```
+
+  * HashMap的计算方式是：
+
+    ```java
+    hash=(key == null) ? 0 : (h = key.hashCode()) ^ (h >>> 16)
+    index= hash & (tab.lenght-1)     //采用了hash值与哈希数组-1按位与的方式获取下标，这种方式效率更高
+    ```
+
+    
