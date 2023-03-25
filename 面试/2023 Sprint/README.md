@@ -643,6 +643,10 @@ Node 类型的定义是一个典型的双链表的树结构样式，有一个`ne
 
   基于拷贝内容的优点是避免了Concurrent Modification Exception，但同样地，迭代器并不能访问到修改后的内容，即：迭代器遍历的是开始遍历那一刻拿到的集合拷贝，在遍历期间原集合发生的修改迭代器是不知道的。
 
+
+
+## 2.2 Java Map
+
 ### jdk1.7 HashMap如何实现？
 
 哈希表的实现方式主要有：开放地址法和链地址法，开放地址法就是当前key被占领了就找下一个位置，下一个位置的定位方案有线性探测再散列、平方探测再散列、随机探测再散列；链地址法就是把hash值相同的放在一个新的叫同义词链的链表里，链表头指针放到value位置。 HashMap采用了**链地址法**来解决哈希冲突。
@@ -873,3 +877,202 @@ Hashtable 是 jdk1.0 开始就支持的哈希表实现，Java 2 重构的Hashtab
     ```
 
     
+
+
+
+# 三、Java多线程
+
+## 3.1 并发基础
+
+### 多线程的出现是要解决什么问题的? 本质什么?
+
+CPU、内存、I/O 设备的速度是有极大差异的，为了合理利用 CPU 的高性能，平衡这三者的速度差异，计算机体系结构、操作系统、编译程序都做出了贡献，主要体现为:
+
+- CPU 增加了缓存，以均衡与内存的速度差异；// 导致可见性问题
+- 操作系统增加了进程、线程，以分时复用 CPU，进而均衡 CPU 与 I/O 设备的速度差异；// 导致原子性问题
+- 编译程序优化指令执行次序，使得缓存能够得到更加合理地利用。// 导致有序性问题
+
+
+
+### 什么是进程?什么是线程？
+
+* **进程**
+
+进程可以理解为一个应用程序执行的实例（比如在windows下打开Word就启动了一个进程），进程是资源分配的最小单位，每个进程都有自己独立的地址空间，每启动一个进程，系统就会为它分配地址空间，建立数据表来维护代码段、堆栈段和数据段。**进程主要有数据、程序和程序控制块（PCB）组成，其中PCB是系统感知进程存在的唯一标志。**
+
+* **线程**
+
+线程是进程中的一个执行单元，一个进程中可以启动多个线程，并且一个进程中的多个线程可以共享此进程中的所用资源。每个线程都有自己独立的运行时桟和程序计数器，**线程是CPU调度的最小单位**。
+
+### 并发和并行的概念？
+
+- **并发（concurrent）**
+
+  单核CPU 下，操作系统通过任务调度器，将CPU的时间片分给不同的线程使用，只是由于CPU的切换速度非常快（Windows下一个最小的时间片是15ms），让用户看上去是同步执行的，实际上还是串性执行的。**这种线程轮流使用CPU的方法叫并发。**
+
+- **并行（parallel）**
+
+  **多个cpu或者多台机器同时处理任务**，是真正意义上的同时执行。
+
+
+
+### 线程安全有哪些实现思路?
+
+实现线程的安全的主要思路/方法有三种：互斥同步、非阻塞同步和无同步
+
+#### 互斥同步
+
+**互斥同步是实现线程安全最直接的方式，这种方式主要的实现方式就是控制对共享资源的访问进行互斥访问实现**，Java 中 的 `synchronized` 、`ReentrantLock` 以及各种`分布式锁`实现方案都是基于这种思想。
+
+
+
+#### 非阻塞同步
+
+互斥同步最主要的问题就是线程阻塞和唤醒所带来的性能问题，因此这种同步也称为阻塞同步。
+
+互斥同步属于一种悲观的并发策略，总是认为只要不去做正确的同步措施，那就肯定会出现问题。无论共享数据是否真的会出现竞争，它都要进行加锁(这里讨论的是概念模型，实际上虚拟机会优化掉很大一部分不必要的加锁)、用户态核心态转换、维护锁计数器和检查是否有被阻塞的线程需要唤醒等操作。
+
+
+
+**相应的非阻塞同步是一种乐观并发策略，这种实现方式主要是依靠类似版本号机制来实现**的。常见的非阻塞同步方式有以下几种：
+
+##### CAS（Compare And Swap）
+
+随着硬件指令集的发展，我们可以使用基于冲突检测的乐观并发策略: 先进行操作，如果没有其它线程争用共享数据，那操作就成功了，否则采取补偿措施(不断地重试，直到成功为止)。这种乐观的并发策略的许多实现都不需要将线程阻塞，因此这种同步操作称为非阻塞同步。
+
+乐观锁需要操作和冲突检测这两个步骤具备原子性，这里就不能再使用互斥同步来保证了，只能靠硬件来完成（`lock cmpxchg`指令）。硬件支持的原子性操作最典型的是: 比较并交换(Compare-and-Swap，CAS)。**CAS 指令需要有 3 个操作数，分别是内存地址 V、旧的预期值 A 和 新值 B。当执行操作时，只有当 V 的值等于 A，才将 V 的值更新为 B，否则什么都不做**。
+
+
+
+##### Atomic原子类
+
+J.U.C 包里面的原子类 AtomicXxx，其中的 compareAndSet() 和 getAndIncrement() 等方法都使用了 Unsafe 类的 CAS 操作。以AtomicInteger为例：
+
+以下代码是 `incrementAndGet()` 的源码，它调用了 `unsafe` 的 `getAndAddInt() `。
+
+```java
+public final int incrementAndGet() {
+    return unsafe.getAndAddInt(this, valueOffset, 1) + 1;
+}
+```
+
+以下代码是 `getAndAddInt()` 源码，var1 指示对象内存地址，var2 指示该字段相对对象内存地址的偏移，var4 指示操作需要加的数值，这里为 1。通过 `getIntVolatile(var1, var2)` 得到旧的预期值，通过调用 `compareAndSwapInt()` 来进行 CAS 比较，如果该字段内存地址中的值等于 var5，那么就更新内存地址为 var1+var2 的变量为 var5+var4。
+
+可以看到 getAndAddInt() 在一个循环中进行，发生冲突的做法是不断的进行重试。
+
+```java
+public final int getAndAddInt(Object var1, long var2, int var4) {
+    int var5;
+    do {
+        var5 = this.getIntVolatile(var1, var2);
+    } while(!this.compareAndSwapInt(var1, var2, var5, var5 + var4));
+
+    return var5;
+}
+```
+
+
+
+
+
+##### ABA问题
+
+* **什么是ABA问题，为什么有ABA问题**
+
+  所谓`ABA`问题，比如数值`i = 5`，`A`线程本来想改成10，在更改之前，`B`线程先将i先由5变成了6，再更新成5，但是`A`线程并不知道`i`发生过改变，仍然将`i`改成10。尽管最后的结果没有问题，但是整个过程还是不对的。
+
+* **ABA问题的解决方法？**
+
+  一般的解决方法是给共享数据加上一个版本号(version)，每次修该之前不仅要比较预期值和内存值是否一致，还要比较版本号是否一致，只有两者同时满足才可以修改，修改值之后将版本号同时更新。
+
+  
+
+  **Java中的解决方法是使用时间戳作为版本，比如AtomicStampedReference这个类中就使用了一个stamp字段来存储时间戳当做版本**
+
+
+
+#### 无同步方案
+
+要保证线程安全，并不是一定就要进行同步。如果一个方法本来就不涉及共享数据，那它自然就无须任何同步措施去保证正确性。
+
+##### 栈封闭
+
+多个线程访问同一个方法的局部变量时，不会出现线程安全问题，因为局部变量存储在虚拟机栈中，属于线程私有的，这里还有一个Java 内存分配的知识点：**栈上分配**。
+
+
+
+##### 线程本地存储(Thread Local Storage)
+
+如果一段代码中所需要的数据必须与其他代码共享，那就看看这些共享数据的代码是否能保证在同一个线程中执行。如果能保证，我们就可以把共享数据的可见范围限制在同一个线程之内，这样，无须同步也能保证线程之间不出现数据争用的问题。
+
+符合这种特点的应用并不少见，大部分使用消费队列的架构模式(如“生产者-消费者”模式)都会将产品的消费过程尽量在一个线程中消费完。其中最重要的一个应用实例就是经典 Web 交互模型中的“一个请求对应一个服务器线程”(Thread-per-Request)的处理方式，这种处理方式的广泛应用使得很多 Web 服务端应用都可以使用线程本地存储来解决线程安全问题。
+
+可以使用` java.lang.ThreadLocal` 类来实现线程本地存储功能。
+
+为了理解 ThreadLocal，先看以下代码:
+
+```java
+public class ThreadLocalExample1 {
+    public static void main(String[] args) {
+        ThreadLocal threadLocal1 = new ThreadLocal();
+        ThreadLocal threadLocal2 = new ThreadLocal();
+        Thread thread1 = new Thread(() -> {
+            threadLocal1.set(1);
+            threadLocal2.set(1);
+        });
+        Thread thread2 = new Thread(() -> {
+            threadLocal1.set(2);
+            threadLocal2.set(2);
+        });
+        thread1.start();
+        thread2.start();
+    }
+}
+```
+
+它所对应的底层结构图为:
+
+![](https://pdai.tech/images/pics/3646544a-cb57-451d-9e03-d3c4f5e4434a.png)
+
+每个 Thread 都有一个 `ThreadLocal.ThreadLocalMap` 对象，Thread 类中就定义了 ThreadLocal.ThreadLocalMap 成员。
+
+```java
+/* ThreadLocal values pertaining to this thread. This map is maintained
+ * by the ThreadLocal class. */
+ThreadLocal.ThreadLocalMap threadLocals = null;
+```
+
+当调用一个 ThreadLocal 的 `set(T value)` 方法时，先得到当前线程的 ThreadLocalMap 对象，然后将 `ThreadLocal->value `键值对插入到该 Map 中。
+
+```java
+public void set(T value) {
+    Thread t = Thread.currentThread();
+    ThreadLocalMap map = getMap(t);
+    if (map != null)
+        map.set(this, value);
+    else
+        createMap(t, value);
+}
+```
+
+get() 方法类似。
+
+```java
+public T get() {
+    Thread t = Thread.currentThread();
+    ThreadLocalMap map = getMap(t);
+    if (map != null) {
+        ThreadLocalMap.Entry e = map.getEntry(this);
+        if (e != null) {
+            @SuppressWarnings("unchecked")
+            T result = (T)e.value;
+            return result;
+        }
+    }
+    return setInitialValue();
+}
+```
+
+**ThreadLocal 从理论上讲并不是用来解决多线程并发问题的，因为根本不存在多线程竞争**。
+
+在一些场景 (尤其是使用线程池) 下，由于 ThreadLocal.ThreadLocalMap 的底层数据结构导致 ThreadLocal 有内存泄漏的情况，应该尽可能**在每次使用 ThreadLocal 后手动调用 remove()，以避免出现 ThreadLocal 经典的内存泄漏甚至是造成自身业务混乱的风险**。
