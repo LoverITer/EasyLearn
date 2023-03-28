@@ -1808,17 +1808,185 @@ JUC框架包主要包含5大部分：
 
 ## 3.4 J.U.C锁详解
 
+### 什么是AQS?
+
+`AQS（AbstractQueuedSynchronizer）`是 Java 并发包中一个提供原子性状态管理的基础工具类。AQS 可以用来构建同步器，例如 `ReentrantLock`、`Semaphore`、`CountDownLatch` 等。它是一个抽象类，使用了`模板方法`设计模式，允许子类通过继承和重写其内部方法来实现自定义的同步器。
+
+AQS 内部维护了一个等待队列和一个int类型的同步状态。等待队列用于存储等待获取同步状态的线程，并按照先进先出的顺序进行排队；同步状态则表示当前同步器的状态，可以被多个线程并发获取和释放。AQS 提供了 acquire() 和 release() 方法来获取和释放同步状态，通过实现这些方法可以定义不同的同步逻辑。
+
+AQS 内部使用了 CAS（Compare-And-Swap）操作来实现同步状态的原子性修改，同时也提供了一些支持扩展的方法，例如 tryAcquire()、tryRelease()、tryAcquireShared()、tryReleaseShared() 等，可以用于实现不同种类的同步器。AQS 的实现方式非常灵活，可以通过继承它来实现各种同步器，例如独占锁、共享锁等。
 
 
 
+### AQS的核心思想是什么? 它是怎么实现的? 底层数据结构等
+
+#### AQS数据结构
+
+![](http://image.easyblog.top/167992250739443fe0755-e3bb-4c4c-9b1a-f3730fbc1cfb.png)
+
+AQS（AbstractQueuedSynchronizer）的核心设计原理是基于一个**先进先出的等待队列**和一个**共享的状态变量**，通过线程的竞争和等待来实现对共享状态的管理和同步
+
+![img](https://p0.meituan.net/travelcube/7132e4cef44c26f62835b197b239147b18062.png)
+
+AQS 的等待队列是一个双向链表，用于存储等待获取同步状态的线程，并按照先进先出的顺序进行排队。队列中的每个节点包含了一个线程引用和一个等待状态（例如是否被阻塞、是否被中断等）。线程获取同步状态时，如果发现当前状态已经被其他线程占用，则该线程会被加入到等待队列中，并被阻塞。当状态被释放时，AQS 会从等待队列中唤醒下一个等待线程。
+
+每个Node节点中有以下几个重要的属性：
+
+![](http://image.easyblog.top/16799220634494109f2a8-bf7b-4b7e-95c2-6c83124e92e9.png)
+
+AQS中有两种锁模式：
+
+* SHARED： 表示线程以共享的模式等待锁
+* EXCLUSIVE：表示线程正在以独占的方式等待锁
+
+waitStatus有下面几个枚举值：
+
+* 0：当一个Node被初始化的时候的默认值
+* CANCELLED（1）：表示线程获取锁的请求已经取消了
+* CONDITION（-2）：表示节点在等待队列中，节点线程等待唤醒
+* PROPAGATE（-3）：当前线程处在SHARED情况下，该字段才会使用
+* SIGNAL（-1）：表示线程已经准备好了，就等资源释放了
 
 
 
+### AQS有哪些核心的方法?
+
+AQS提供了大量用于自定义同步器实现的Protected方法。自定义同步器实现的相关方法也只是为了通过修改State字段来实现多线程的独占模式或者共享模式。自定义同步器需要实现以下方法：
+
+![](http://image.easyblog.top/16800049061287c39c48c-a122-4958-8f9b-8c1dc12e642c.png)
+
+一般来说，自定义同步器要么是独占方式，要么是共享方式，它们也只需实现 `tryAcquire/tryRelease `或 `tryAcquireShared/tryReleaseShared` 中的一种即可。AQS也支持自定义同步器同时实现独占和共享两种方式，如ReentrantReadWriteLock。ReentrantLock是独占锁，所以实现了 `tryAcquire/tryRelease`。
+
+以非公平锁为例，这里主要阐述一下非公平锁与AQS之间方法的关联之处，具体每一处核心方法的作用会在文章后面详细进行阐述。
+
+![img](https://p1.meituan.net/travelcube/b8b53a70984668bc68653efe9531573e78636.png)
+
+为了帮助大家理解ReentrantLock和AQS之间方法的交互过程，以非公平锁为例，我们将加锁和解锁的交互流程单独拎出来强调一下，以便于对后续内容的理解。
+
+![img](https://p1.meituan.net/travelcube/7aadb272069d871bdee8bf3a218eed8136919.png)
+
+加锁：
+
+- 通过ReentrantLock的加锁方法Lock进行加锁操作。
+- 会调用到内部类Sync的Lock方法，由于Sync#lock是抽象方法，根据ReentrantLock初始化选择的公平锁和非公平锁，执行相关内部类的Lock方法，本质上都会执行AQS的Acquire方法。
+- AQS的Acquire方法会执行tryAcquire方法，但是由于tryAcquire需要自定义同步器实现，因此执行了ReentrantLock中的tryAcquire方法，由于ReentrantLock是通过公平锁和非公平锁内部类实现的tryAcquire方法，因此会根据锁类型不同，执行不同的tryAcquire。
+- tryAcquire是获取锁逻辑，获取失败后，会执行框架AQS的后续逻辑，跟ReentrantLock自定义同步器无关。
+
+解锁：
+
+- 通过ReentrantLock的解锁方法Unlock进行解锁。
+- Unlock会调用内部类Sync的Release方法，该方法继承于AQS。
+- Release中会调用tryRelease方法，tryRelease需要自定义同步器实现，tryRelease只在ReentrantLock中的Sync实现，因此可以看出，释放锁的过程，并不区分是否为公平锁。
+- 释放成功后，所有处理由AQS框架完成，与自定义同步器无关。
+
+### ReentrantLock 加锁和解锁原理？
+
+`ReentrantLock` 是AQS比较典型的应用，ReentrantLock有公平锁和非公平锁两种模式，底层机制都是类似的，这里以非公平锁为例进行分析加锁和解锁的原理，进而理解AQS的原理。
+
+#### 加锁
+
+##### lock
+
+ReentrantLock 中获取锁的方法是 `lock` 方法，方法调用了内部类`Sync`的`lock` 方法，`Sync` 类是`AQS`的子类同时是一个抽象类，在AQS中`Sync`有两种实现`FairSync` 和 `NonFairSync`，即 公平锁 和 非公平锁。这里我们看一下非公平锁的加锁实现。
+
+![](http://image.easyblog.top/16800104595274d0aaa87-f5ae-4b45-97c3-09cff7bc776f.png)
+
+* 首先，当前线程会尝试使用 CAS 的方式修改AQS中state的值从0修改为1，如果修改成功，设置当前线程为线程持有者
+* 如果修改state失败，则进入`acquire`方法
 
 
 
+##### acquire
+
+![](http://image.easyblog.top/16800110226652b659bf8-1854-4b96-8348-6648849da10b.png)
+
+AQS 在这里使用了模板方法设计模式，`tryAcquire`方法是需要子类来实现的方法，方法返回boolean值，返回true表示获取锁成功，此时AQS会讲当前线程设置为锁持有者并且设置为可以中断的，如果没有获取锁成功，则通过 `addWaiter` 和 `acquireQueued` 将当前线程添加到等待队列末尾。
 
 
+
+##### tryAcquire（nonfairTryAcquire）—获取锁
+
+`tryAcquire` 方法由 AQS 子类实现，这里就是 `NonfairSync`的 `tryAcquire` 实现，具体逻辑在 父类Sync的`nonfairTryAcquire`方法中做了实现
+
+![](http://image.easyblog.top/1680011405428e3ce9d9c-e707-4ccf-b771-73c6a7c6541e.png)
+
+方法中当前线程根据当前state值不同做出不同动作：
+
+* 当 **state=0**，再次尝试使用CAS的方式将state的值从0修改为1，如果设置成功就表示加锁成功，则将自己设置为锁持有者
+
+* 当 **state!=0**，这里 ReentrantLock 实现了重入锁的逻辑， 当当前线程判断锁持有者是自己则直接将state的值+1，表示锁的加锁次数
+
+* 最后，获取锁成功会返回true，否则返回false
+
+
+
+##### addWaiter—线程加入等待队列
+
+当执行`acquire(1)`时，会通过`tryAcquire(1)`获取锁。在这种情况下，如果获取锁失败，就会调用`addWaiter(Node.EXCLUSIVE)`以独占模式将当前线程加入到等待队列中去。
+
+![](http://image.easyblog.top/16800127570002dddfc52-4058-42ae-8470-b495decdb709.png)
+
+主要逻辑如下：
+
+* 首先通过当前的线程和锁模式新建一个等待队列节点。
+* 将变量pred指向等待队列尾指针tail
+* 如果pred指向尾不是Null，则将新创建的Node节点的prev指向pred，随后使用 CAS 的方式将等待队列的tail指针指向新加入的Node节点，设置成功将pred的next节点设置为新加入的Node节点
+* 如果Pred指针是Null（说明等待队列中没有元素），或者当前Pred指针和Tail指向的位置不同（说明被别的线程已经修改），就需要看一下`enq`的方法。
+
+
+
+##### enq—自旋加入等到队列
+
+![](http://image.easyblog.top/1680013504809ec585612-0ced-47ee-a812-c188118c71d8.png)
+
+方法是一个死循环，会不断重复做下面两件事：
+
+* 获取当前等待队列tail节点，如果tail节点是Null，表示等待队列还没有初始化，则需要进行初始化，此时会初始化等待队列的头和尾节点指向**同一个空节点**
+* 如果tail节点不是Null，表示当前等待队列是有初始化过的，则会不断重试将enq入参的node节点（当前线程包装的等待队列节点）设置为当前等待队列的尾节点，直到设置成功。
+
+
+
+##### acquireQueued—自旋获取锁
+
+经过 `addWaiter` 方法，未成功获取锁的线程已经被添加到等待队列尾部，下面就需要**让线程在等待队列中自旋不断地获取锁，直到获取成功或者不再需要获取（中断）**。
+
+![](http://image.easyblog.top/16800145946440797ca73-7cf3-426a-8411-1ccbb38bf7eb.png)
+
+方法主体是死循环，主要逻辑：
+
+* 获取当前节点的前驱节点
+  * **如果当前节点是头结点 并且 节点获取锁成功，则将head指针移动到当前节点，并将当前节点设置为虚节点**
+  * **如果当前节点是头结点 并且 节点获取锁未成功**，会判断当前节点是否需要阻塞：
+    * 如果当前节点需要阻塞，则调用 `LockSupport.part(this)`方法阻塞当前方法
+    * 如果当前节点不需要阻塞，则重新尝试调用 `tryAcquire`重新获取锁
+
+
+
+上述方法的流程图如下：
+
+
+
+![img](https://p0.meituan.net/travelcube/c124b76dcbefb9bdc778458064703d1135485.png)
+
+从上图可以看出**，跳出当前循环的条件是当“前置节点是头结点，且当前线程获取锁成功”**。但为了防止因死循环导致CPU资源被浪费，我们会判断前置节点的状态来决定是否要将当前线程挂起，具体挂起流程用流程图表示如下（`shouldParkAfterFailedAcquire`流程）：
+
+![img](https://p0.meituan.net/travelcube/9af16e2481ad85f38ca322a225ae737535740.png)
+
+
+
+#### 解锁
+
+前面我们已经剖析了加锁过程中的基本流程，接下来再对解锁的基本流程进行分析。由于ReentrantLock在解锁的时候，并不区分公平锁和非公平锁，所以我们直接看解锁的源码：
+
+##### unlock/release—释放锁
+
+`ReentrantLock` 锁的unlock方法直接调用 `Sync`类的`release`方法，
+
+![](http://image.easyblog.top/168001708651070b47562-26f3-4f90-8d94-fdbed3eb2e36.png)
+
+
+
+https://tech.meituan.com/2019/12/05/aqs-theory-and-apply.html
 
 
 
