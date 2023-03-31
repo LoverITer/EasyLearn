@@ -3458,6 +3458,8 @@ size()方法就是求当前ConcurrentHashMap中元素实际个数的方法，它
 
 <img src="https://image.easyblog.top/QQ%E6%88%AA%E5%9B%BE20210121205801.png" style="zoom:50%;" />
 
+
+
 **jdk1.8 ConcurrentHashMap**
 
 JDK1.8的实现已经摒弃了Segment的概念，而是直接使用 **数组+链表+红黑树** 的数据结构来实现的，**并发控制使用的是CAS+synchronized**，jdk1.8版本的ConcurrentHashMap看起来就像是优化过之后线程安全的HashMap,虽然在JDK1.8中还能看到Segment的身影，但是已经简化了属性，只是为了兼容旧版本。下图是jdk1.8中ConcurrentHashMap的结构示意图：

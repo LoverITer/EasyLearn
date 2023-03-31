@@ -1980,38 +1980,980 @@ AQS 在这里使用了模板方法设计模式，`tryAcquire`方法是需要子�
 
 ##### unlock/release—释放锁
 
-`ReentrantLock` 锁的unlock方法直接调用 `Sync`类的`release`方法，
+`ReentrantLock` 锁的`unlock`方法直接调用 `Sync`类的`release`方法，所以直接看 `release`方法
 
 ![](http://image.easyblog.top/168001708651070b47562-26f3-4f90-8d94-fdbed3eb2e36.png)
 
+* 自定义的tryRelease如果返回true，说明该锁没有被任何线程持有（锁被释放）
+* 如果锁被释放，判断当前头结点不为空并且头结点的waitStatus不是初始化节点情况，则调用 `unparkSuccessor`方法唤醒后继节点
 
 
-https://tech.meituan.com/2019/12/05/aqs-theory-and-apply.html
+
+**这里的判断条件为什么是 `h != null && h.waitStatus != 0` ？**
+
+> 1. h == null Head还没初始化。初始情况下，head == null，第一个节点入队，Head会被初始化一个虚拟节点。所以说，这里如果还没来得及入队，就会出现head == null 的情况。
+> 2. h != null && waitStatus == 0 表明后继节点对应的线程仍在运行中，不需要唤醒。
+> 3. h != null && waitStatus < 0 表明后继节点可能被阻塞了，需要唤醒。
 
 
+
+##### tryRelease—释放锁
+
+在ReentrantLock里面的公平锁和非公平锁的父类Sync定义了可重入锁的释放锁机制 `tryRelease`。
+
+![](https://image.easyblog.top/%E6%88%AA%E5%B1%8F2023-03-29%20%E4%B8%8B%E5%8D%888.30.34.png)
+
+方法返回boolean值，表示当前线程是否释放锁成功，true 表示已释放，false表示没有释放，具体逻辑如下：
+
+* 获取当前锁state值，并将锁重入次数减一
+* 如果当前线程不是持有锁的线程，则报错
+* 如果当前线程是持有锁的线程，并且state值是0了，则将当前独占锁所有线程设置为null，并更新state
+
+
+
+##### unparkSuccessor—唤醒后继结点
+
+![](https://image.easyblog.top/%E6%88%AA%E5%B1%8F2023-03-29%20%E4%B8%8B%E5%8D%889.31.05.png)
+
+* 获取头结点`waitStatus`，如果头结点等待状态 `waitStatus < 0`  ，说明头结点 
+* 获取当前节点的下一个节点
+  * 如果当前节点的下个节点不为空，而且等待状态`waitStatus<=0`，就把当前节点的下一个节点唤醒
+  * 如果下个节点是null或者下个节点被cancelled，就找到队列最开始的非cancelled的节点
+    * 寻找的方式是从尾部开始往前遍历等待队列，直到找到队列第一个waitStatus<0的节点，
+    * 如果找到这样的节点，则将此节点唤醒
+
+
+
+**为什么要从后往前找第一个非Cancelled的节点呢？**
+
+> 这里可以回到 `addWaiter` AQS将线程加入等到队列的操作说起，**节点入队并不是原子操作**，也就是说，node.prev = pred; compareAndSetTail(pred, node) 这两个地方可以看作Tail入队的原子操作，但是此时pred.next = node;还没执行，如果这个时候执行了unparkSuccessor方法，就没办法从前往后找了，所以需要从后往前找。还有一点原因，在产生CANCELLED状态节点的时候，先断开的是Next指针，Prev指针并未断开，因此也是必须要从后往前遍历才能够遍历完全部的Node。
+>
+> 
+>
+> **综上所述，如果是从前往后找，由于极端情况下入队的非原子操作和CANCELLED节点产生过程中断开Next指针的操作，可能会导致无法遍历所有的节点**。
+
+
+
+
+
+
+
+### ReentrantLock/Lock 锁 和 synchronized 锁的区别？
+
+* （1）**synchronized是Java的关键字是jvm层面上的互斥锁，ReentrantLock/Lock 通过类实现的一个互斥锁**
+* （2）**使用synchronized时，当线程执行完同步代码之后或者出现异常之后jvm会自动让线程释放锁；但是ReentrantLock/Lock 在使用的时候必须手动显示的在finally块中释放锁,如果没这样做，容易产生死锁**
+* （3）**ReentrantLock/Lock 可以让等待锁的线程响应中断，而synchronized却不行，使用synchronized时，等待的线程会一直等待下去，不能够响应中断；**
+* （4）**通过 ReentrantLock/Lock 可以知道有没有成功获取锁，而synchronized却无法办到**
+* （5）**ReentrantLock/Lock 可以提高多个线程进行读操作的效率。从性能上来说，如果竞争资源不激烈，两者的性能是差不多的，而当竞争资源非常激烈时（即有大量线程同时竞争），此时Lock的性能要远远优于synchronized**。
+
+
+
+### CountDownLatch原理简介？
+
+CountDownLatch是一个同步工具类，用来协调多个线程之间的同步。这个工具通常用来控制线程等待，它可以让某一个线程等待直到倒计时结束，再开始执行。
+
+**CountDownLatch 的两种应用场景**：
+
+1. 某一线程在开始运行前等待n个线程执行完毕。将 CountDownLatch 的计数器初始化为n ：`new CountDownLatch(n)`，每当一个任务线程执行完毕，就将计数器减1 `countdownlatch.countDown()`，当计数器的值变为0时，在 `CountDownLatch上 await()` 的线程就会被唤醒。一个典型应用场景就是启动一个服务时，主线程需要等待多个组件加载完毕，之后再继续执行。
+
+2. 实现多个线程开始执行任务的最大并行性。注意是并行性，不是并发，强调的是多个线程在某一时刻同时开始执行。类似于赛跑，将多个线程放到起点，等待发令枪响，然后同时开跑。做法是初始化一个共享的 `CountDownLatch` 对象，将其计数器初始化为 1 ：`new CountDownLatch(1)`，多个线程在开始执行任务前首先 `coundownlatch.await()`，当主线程调用 countDown() 时，计数器变为0，多个线程同时被唤醒。
+
+**CountDownLatch 的不足**
+
+CountDownLatch是一次性的，计数器的值只能在构造方法中初始化一次，之后没有任何机制再次对其设置值，当CountDownLatch使用完毕后，它不能再次被使用。
+
+
+
+### CycleBarrier原理简介？
+
+CyclicBarrier 和 CountDownLatch 非常类似，它也可以实现线程间的等待，但是它的功能比 CountDownLatch 更加复杂和强大。主要应用场景和 CountDownLatch 类似
+
+**CyclicBarrier 的应用场景**
+
+CyclicBarrier 可以用于多线程计算数据，最后合并计算结果的应用场景。比如我们用一个Excel保存了用户所有银行流水，每个Sheet保存一个帐户近一年的每笔银行流水，现在需要统计用户的日均银行流水，先用多线程处理每个sheet里的银行流水，都执行完之后，得到每个sheet的日均银行流水，最后，再用barrierAction用这些线程的计算结果，计算出整个Excel的日均银行流水。
+
+
+
+
+
+### Semaphore原理简介？
+
+Semaphore（信号量）， synchronized 和 ReentrantLock 都是一次只允许一个线程访问某个资源，**Semaphore(信号量)可以指定多个线程同时访问某个资源**。Semaphore 有两种模式，公平模式和非公平模式。
+
+- **公平模式：** 调用acquire的顺序就是获取许可证的顺序，遵循FIFO；
+- **非公平模式：** 抢占式的。
 
 
 
 ## 3.5 J.U.C线程池详解
 
+### 为什么要有线程池?
+
+线程池能够对线程进行统一分配，调优和监控:
+
+- **降低资源消耗**。通过重复利用已创建的线程降低线程创建和销毁造成的消耗 
+- **提高响应速度**。当任务到达时，任务可以不需要等到线程创建就能立即执行。 
+- **提高线程的可管理性**。线程是稀缺资源，如果无限制的创建，不仅会消耗系统资源，还会降低系统的稳定性，使用线程池可以进行统一的分配，调优和监控。
+
+
+
+### Java实现和管理线程池有哪些方式? 
+
+1. 使用`java.util.concurrent.Executors`工厂类创建线程池。这个工厂类提供了几种预定义的线程池实现，如`newFixedThreadPool`，`newCachedThreadPool`和`newSingleThreadExecutor`等，可以根据应用场景选择不同的线程池。
+2. 自定义ThreadPoolExecutor线程池，这是一种比较灵活的方式，可以通过`ThreadPoolExecutor`的构造函数来指定线程池的核心线程数、最大线程数、队列容量等参数。
+3. 可以使用`ScheduledThreadPoolExecutor`来实现定时任务调度。ScheduledThreadPoolExecutor是ThreadPoolExecutor的一个子类，可以用来定时执行任务或周期性地执行任务。
+4. Java 8引入了`CompletableFuture`类，可以使用它的异步特性来实现线程池的管理。
+5. Java 9引入了新的工厂类，如Flow类和SubmissionPublisher类，可以实现异步任务的处理和结果处理。
+
+
+
+### ThreadPoolExecutor有哪些核心的配置参数? 请简要说明
+
+**线程池的构造方法**
+
+```java
+public ThreadPoolExecutor(int corePoolSize,
+                          int maximumPoolSize,
+                          long keepAliveTime,
+                          TimeUnit unit,
+                          BlockingQueue<Runnable> workQueue,
+                          ThreadFactory threadFactory,
+                          RejectedExecutionHandler handler) {
+    //省略.....
+}
+```
+
+- 1、**corePoolSize**：线程池中核心线程个数
+
+- 2、**maximunPoolSize**：线程池最大允许的线程个数（这里有一个救急线程的概念，就是非核心线程，它的数量是maximunPoolSize-corePoolSize）
+
+- 3、**keepAliveTime**：这个参数是给非核心线程设定的，他表示非核心线程可以空闲时间，超过这个时间就会被回收
+
+- 4、**unit**：空闲时间的单位
+
+- 5、**workQueue**：任务队列，它是一个阻塞队列，用于存放等待执行的任务。
+
+- 6、**threadFactory**：线程工厂，用于创建线程以及可以给线程起一个有意义的名字
+
+- 7、**RejectedExecutionHandler**：当任务队列和线程池都处于满负荷运行时，新提交的任务应该如何处理的策略，称为**饱和策略**。Java中提供的策略有以下4种：
+
+  > （1）ThreadPoolExecutor.AbortPolicy：直接抛出异常，这是默认的策略
+  >
+  > （2）ThreadPoolExecutor.CallerRunsPolicy：让调用者来执行该任务
+  >
+  > （3）ThreadPoolExecutor.DisCardPolicy：不做任何处理，直接把任务丢掉，也不抛出任何异常
+  >
+  > （4）ThreadPoolExecutor.DisCardOldestPolicy：丢弃任务队列头部的任务，然后尝试执行当前任务
+
+  当然，我们也可以根据我们的业务场景通过实现`RejectExeptionPolicy`接口实现自定义策略。
+
+
+
+### ThreadPoolExecutor线程池任务提交的流程
+
+![img](http://image.easyblog.top/158636140301387db9ed6-7a20-42db-94d6-5377024a8cc7.jpg)
+
+* （1）首先会判断运行中的线程数是否小于corePoolSize，如果小于，则直接创建新的线程执行任务。
+* （2）如果运行中的线程大于corePoolSize，判断workQueue任务队列是否已经满了，如果还没有满，则将任务放到任务队列中排队等待被处理；
+* （3）如果workQueue任务队列满了，则判断当前线程数是否大于线程池的最大线程数，如果没有大于最大线程数则创建新的线程处理任务；
+* （4）如果运行中的线程数大于最大线程数，则通过拒绝策略处理新提交的任务。在ThreadPoolExecutor中提供了4种拒绝策略：AbortPolicy：直接抛出异常，这是默认的策略；CallerRunsPolicy：让调用者来执行该任务；DisCardPolicy：不做任何处理，直接把任务丢掉，也不抛出任何异常；DisCardOldestPolicy：丢弃任务队列头部的任务，然后尝试执行当前任务
+
+
+
+### 线程池中任务是如何关闭的?
+
+关闭线程池可以使用线程池的`shutdown` 或 `shutdownNow`方法
+
+- shutdown
+
+将线程池里的线程状态设置成SHUTDOWN状态, 然后中断所有没有正在执行任务的线程.
+
+- shutdownNow
+
+将线程池里的线程状态设置成STOP状态, 然后停止所有正在执行或暂停任务的线程. 只要调用这两个关闭方法中的任意一个, isShutDown() 返回true. 当所有任务都成功关闭了, isTerminated()返回true.
+
+
+
+### 如何合理配置线程池参数？
+
+要想合理的配置线程池，就必须首先分析任务特性，可以从以下几个角度来进行分析：
+
+1. 任务的性质：CPU密集型任务，IO密集型任务和混合型任务。
+2. 任务的优先级：高，中和低。
+3. 任务的执行时间：长，中和短。
+4. 任务的依赖性：是否依赖其他系统资源，如数据库连接。
+
+任务性质不同的任务可以用不同规模的线程池分开处理。CPU密集型任务配置尽可能少的线程数量，如配置**Ncpu+1**个线程的线程池。IO密集型任务则由于需要等待IO操作，线程并不是一直在执行任务，则配置尽可能多的线程，如**2xNcpu**。混合型的任务，如果可以拆分，则将其拆分成一个CPU密集型任务和一个IO密集型任务，只要这两个任务执行的时间相差不是太大，那么分解后执行的吞吐率要高于串行执行的吞吐率，如果这两个任务执行时间相差太大，则没必要进行分解。我们可以通过`Runtime.getRuntime().availableProcessors()`方法获得当前设备的CPU个数。
+
+优先级不同的任务可以使用优先级队列PriorityBlockingQueue来处理。它可以让优先级高的任务先得到执行，需要注意的是如果一直有优先级高的任务提交到队列里，那么优先级低的任务可能永远不能执行。
+
+执行时间不同的任务可以交给不同规模的线程池来处理，或者也可以使用优先级队列，让执行时间短的任务先执行。
+
+依赖数据库连接池的任务，因为线程提交SQL后需要等待数据库返回结果，如果等待的时间越长CPU空闲时间就越长，那么线程数应该设置越大，这样才能更好的利用CPU。
+
+并且，阻塞队列**最好是使用有界队列**，如果采用无界队列的话，一旦任务积压在阻塞队列中的话就会占用过多的内存资源，甚至会使得系统崩溃。
+
+
+
+### ScheduledThreadPoolExecutor有什么样的数据结构，核心内部类和抽象类?
+
+![img](https://pdai.tech/images/thread/java-thread-x-stpe-1.png)
+
+ScheduledThreadPoolExecutor继承自 `ThreadPoolExecutor`。ScheduledThreadPoolExecutor 内部构造了两个内部类 `ScheduledFutureTask` 和 `DelayedWorkQueue`:
+
+- `ScheduledFutureTask`: 继承了FutureTask，是一个异步运算任务；最上层分别实现了Runnable、Future、Delayed接口，说明它是一个可以延迟执行的异步运算任务。
+- `DelayedWorkQueue`: 这是 ScheduledThreadPoolExecutor 为存储周期或延迟任务专门定义的一个延迟队列，继承了 AbstractQueue，为了契合 ThreadPoolExecutor 也实现了 BlockingQueue 接口。它内部只允许存储 RunnableScheduledFuture 类型的任务。与 DelayQueue 的不同之处就是它只允许存放 RunnableScheduledFuture 对象，并且自己实现了二叉堆(DelayQueue 是利用了 PriorityQueue 的二叉堆结构)。
 
 
 
 
 
+### ScheduledThreadPoolExecutor相比ThreadPoolExecutor有哪些特性?
+
+ScheduledThreadPoolExecutor继承自 ThreadPoolExecutor，为任务提供延迟或周期执行，属于线程池的一种。和 ThreadPoolExecutor 相比，它还具有以下几种特性:
+
+- 使用专门的任务类型—ScheduledFutureTask 来执行周期任务，也可以接收不需要时间调度的任务(这些任务通过 ExecutorService 来执行)。
+- 使用专门的存储队列—DelayedWorkQueue 来存储任务，DelayedWorkQueue 是无界延迟队列DelayQueue 的一种。相比ThreadPoolExecutor也简化了执行机制(delayedExecute方法，后面单独分析)。
+- 支持可选的run-after-shutdown参数，在池被关闭(shutdown)之后支持可选的逻辑来决定是否继续运行周期或延迟任务。并且当任务(重新)提交操作与 shutdown 操作重叠时，复查逻辑也不相同。
 
 
 
 
+
+### Fork/Join主要用来解决什么样的问题?
+
+Fork/Join是一种**并行编程模型**，它主要**用于解决计算密集型问题**，即需要进行大量计算的任务。
+
+该模型基于“分而治之”的策略，通过将一个大任务划分为许多小任务，然后并行地执行这些小任务，最终将它们的结果合并成一个最终结果。这个过程通常被称为“fork-join”。
+
+这种并行计算模型非常适合于多核处理器或分布式系统中的并行计算。一些典型的应用包括图像处理、数据分析、并行搜索和排序算法等。
+
+
+
+### Fork/Join框架主要包含哪三个模块? 模块之间的关系是怎么样的?
+
+Fork/Join框架主要包含三个模块:
+
+- `ForkJoinTask`：我们要使用ForkJoin框架，必须首先创建一个ForkJoin任务。它提供在任务中执行fork()和join()操作的机制，通常情况下我们不需要直接继承ForkJoinTask类，而只需要继承它的子类，Fork/Join框架提供了以下两个子类：
+  - `RecursiveAction`：是一种ForkJoinTask的子类，用于表示不需要返回结果的任务，即只需要执行一些操作，而不需要返回结果。
+  - `RecursiveTask`：是一种ForkJoinTask的子类，用于表示需要返回结果的任务，即需要执行一些操作，并返回一个结果。
+- `ForkJoinPool`：是Fork/Join框架的核心，它管理着一组线程池，并提供了线程池的创建、启动、关闭和维护等操作。ForkJoinTask需要通过ForkJoinPool来执行，任务分割出的子任务会添加到当前工作线程所维护的双端队列中，进入队列的头部。当一个工作线程的队列里暂时没有任务时，它会随机从其他工作线程的队列的尾部获取一个任务。
+- `ForkJoinWorkerThread`：是Fork/Join框架中的工作线程，它负责执行具体的任务，并将结果返回给主线程。
+
+这三者的关系是: ForkJoinPool可以通过池中的ForkJoinWorkerThread来处理ForkJoinTask任务。
+
+
+
+### ForkJoinPool类继承关系?
+
+![img](https://pdai.tech/images/thread/java-thread-x-forkjoin-1.png)
+
+内部类介绍:
+
+- `ForkJoinWorkerThreadFactory`: 内部线程工厂接口，用于创建工作线程ForkJoinWorkerThread
+- `DefaultForkJoinWorkerThreadFactory`: ForkJoinWorkerThreadFactory 的默认实现类
+- `InnocuousForkJoinWorkerThreadFactory`: 实现了 ForkJoinWorkerThreadFactory，无许可线程工厂，当系统变量中有系统安全管理相关属性时，默认使用这个工厂创建工作线程。
+- `EmptyTask`: 内部占位类，用于替换队列中 join 的任务。
+- `ManagedBlocker`: 为 ForkJoinPool 中的任务提供扩展管理并行数的接口，一般用在可能会阻塞的任务(如在 Phaser 中用于等待 phase 到下一个generation)。
+- `WorkQueue`: ForkJoinPool 的核心数据结构，本质上是work-stealing 模式的双端任务队列，内部存放 ForkJoinTask 对象任务，使用 @Contented 注解修饰防止伪共享。
+  - 工作线程在运行中产生新的任务(通常是因为调用了 fork())时，此时可以把 WorkQueue 的数据结构视为一个栈，新的任务会放入栈顶(top 位)；工作线程在处理自己工作队列的任务时，按照 LIFO 的顺序。
+  - 工作线程在处理自己的工作队列同时，会尝试窃取一个任务(可能是来自于刚刚提交到 pool 的任务，或是来自于其他工作线程的队列任务)，此时可以把 WorkQueue 的数据结构视为一个 FIFO 的队列，窃取的任务位于其他线程的工作队列的队首(base位)。
+- 伪共享状态: 缓存系统中是以缓存行(cache line)为单位存储的。缓存行是2的整数幂个连续字节，一般为32-256个字节。最常见的缓存行大小是64个字节。当多线程修改互相独立的变量时，如果这些变量共享同一个缓存行，就会无意中影响彼此的性能，这就是伪共享。
+
+
+
+### ForkJoinTask抽象类继承关系?
+
+![img](https://pdai.tech/images/thread/java-thread-x-forkjoin-4.png)
+
+ForkJoinTask 实现了 Future 接口，它也是一个可取消的异步运算任务，实际上ForkJoinTask 是 Future 的轻量级实现，主要用在纯粹是计算的函数式任务或者操作完全独立的对象计算任务。fork 是主运行方法，用于异步执行；而 join 方法在任务结果计算完毕之后才会运行，用来合并或返回计算结果。 其内部类都比较简单，ExceptionNode 是用于存储任务执行期间的异常信息的单向链表；其余四个类是为 Runnable/Callable 任务提供的适配器类，用于把 Runnable/Callable 转化为 ForkJoinTask 类型的任务(因为 ForkJoinPool 只可以运行 ForkJoinTask 类型的任务)。
+
+
+
+### Fork/Join 框架的执行流程/运行机制是怎么样的?
+
+![img](https://pdai.tech/images/thread/java-thread-x-forkjoin-5.png)
+
+
+
+### Fork/Join的分治思想和work-stealing 实现方式?
+
+#### 分治算法(Divide-and-Conquer)
+
+分治算法(Divide-and-Conquer)把任务递归的拆分为各个子任务，这样可以更好的利用系统资源，尽可能的使用所有可用的计算能力来提升应用性能。首先看一下 Fork/Join 框架的任务运行机制:
+
+![img](https://pdai.tech/images/thread/java-thread-x-forkjoin-2.png)
+
+#### work-stealing(工作窃取)算法
+
+工作窃取算法（work-stealing）是一种多线程任务调度算法，在工作窃取算法中，每个线程都维护一个任务队列（也称为工作队列），线程会从自己的任务队列中取出任务执行。当一个线程执行完自己的任务队列中的所有任务时，它会从其他线程的任务队列中“窃取”一些任务来执行，以保证所有线程的任务负载均衡。
+
+工作窃取算法的主要思想是：当一个线程的任务执行完毕时，它会从其他线程的任务队列中随机选择一个任务“窃取”，并将这个任务添加到自己的任务队列中。这样可以避免某个线程的任务队列中出现过多的任务，而其他线程的任务队列却很空闲的情况。
+
+工作窃取算法的优点在于：
+
+1. 它可以充分利用多核处理器的计算资源，提高程序的并发性能。
+2. 它可以避免线程之间的竞争，提高线程的执行效率。
+3. 它可以动态地调整任务的分配策略，从而避免任务的负载不平衡。
+
+
+
+**Tips：**
+
+> 在 ForkJoinPool 中，线程池中每个工作线程(ForkJoinWorkerThread)都对应一个任务队列(WorkQueue)，工作线程优先处理来自自身队列的任务(LIFO或FIFO顺序，参数 mode 决定)，然后以FIFO的顺序随机窃取其他队列中的任务。
+>
+> 具体思路如下:
+>
+> * 每个线程都有自己的一个WorkQueue，该工作队列是一个双端队列。
+> * 队列支持三个功能push、pop、poll
+> * push/pop只能被队列的所有者线程调用，而poll可以被其他线程调用。
+> * 划分的子任务调用fork时，都会被push到自己的队列中。
+> * 默认情况下，工作线程从自己的双端队列获出任务并执行。
+> * 当自己的队列为空时，线程随机从另一个线程的队列末尾调用poll方法窃取任务。
 
 ## 3.6 J.U.C并发集合详解
 
+### ConcurrentHashMap在JDK1.7和JDK1.8中实现有什么差别? 
+
+- `HashTable` : 使用了synchronized关键字对put等操作进行加锁;
+- `ConcurrentHashMap JDK1.7`: 使用分段锁机制实现;
+- `ConcurrentHashMap JDK1.8`: 则使用数组+链表+红黑树数据结构和CAS原子操作实现;
+
+
+
+### ConcurrentHashMap JDK1.7实现的原理是什么?
+
+在JDK1.5~1.7版本，Java使用了分段锁机制实现ConcurrentHashMap.
+
+简而言之，ConcurrentHashMap在对象中保存了一个Segment数组，即将整个Hash表划分为多个分段；而每个Segment元素，它通过继承 ReentrantLock 来进行加锁，所以每次需要加锁的操作锁住的是一个 segment，这样只要保证每个 Segment 是线程安全的，也就实现了全局的线程安全；这样，在执行put操作时首先根据hash算法定位到元素属于哪个Segment，然后对该Segment加锁即可。因此，ConcurrentHashMap在多线程并发编程中可是实现多线程put操作。
+
+
+
+#### 数据结构
+
+jdk1.7 的ConcurrentHashMap的底层数据结构是**数组+链表**，ConcurrentHashMap是主要由**Segment**数组结构和 **HashEntry**数组结构组成。如下图所示。
+
+![img](https://pdai.tech/images/thread/java-thread-x-concurrent-hashmap-1.png)
+
+整个ConcurrentHashMap 由一个个 **Segment** 组成，Segment 代表“部分” 或 “一段”的意思，所以很多地方都会将其描述为分段锁。
+
+简单的理解，ConcurrentHashMap 是一个 Segment数组，Segment 通过继承 ReentrantLock来进行加锁，所以每次需要加锁的操作锁住的是一个 Segment，这样只要保证每个 Segment是线程安全的，也就实现了全局的线程安全性。每个Segment中维护了一个HashEntry数组，它用于存储键值对。
+
+- **Segment继承了ReentrantLock，是一个可重入的锁，它在ConcurretnHashMap中扮演锁的角色**；
+- **HashEntry则用于存储键值对**。它们之间的关系是：一个ConcurrentHashMap包含了一个Segment数组，一个Segment里维护了一个HashEntry数组，HashEntry数组和HashMap结构类似，是一种**数组+链表**的结构，当一个线程需要对HashEntry中的元素修改的时候，必须先获得Segment锁。
+
+
+
+#### **Segment内部类**
+
+首先先来熟悉一下Segment，Segment是ConcurrentHashMap的内部类，它在ConcurrentHashMap就是扮演锁的角色，主要组成如下：
+
+<img src="http://image.easyblog.top/1596449481856c291c686-a3ec-4bf4-bb47-464da2d52590.png" alt="img" style="zoom:67%;" />
+
+重要的即使那个HashEntry，HashEntry是一个和HashMap类似的数据结构，这里值的注意的是他被volatile修饰了。这里复习一下volatile的特性：
+
+（1）可以保证共享变量在多线程之间的内存可见性，即一个线程修改了共享变量的值对于其他线程是这个修改后的是可见的；
+
+（2）可以禁止指令重排序；
+
+（3）volatile可以保证对单次读写操作的原子性；
+
+这里使用volatile修饰HashEntry数组的目的当然是为了保证内存的可见性问题。为什么需要保证HashEntry数组的内存可见性呢？
+
+在往下看源码就会发现，jdk1.7以前的CHM的get操作是不需要加锁的，即**可以并发的读**，只有在写数据的时候才需要加锁，因此为了保证不同线程之前对于一个共享变量的数据一致，使用volatile再好不过。
+
+
+
+#### ConcurrentHashMap 初始化
+
+* `initialCapacity`：初始容量，这个值指的是整个 ConcurrentHashMap的初始容量，实际操作的时候需要平均分给每个 Segment。
+
+* `loadFactor`：负载因子，之前我们说了，Segment 数组不可以扩容，所以这个负载因子是给每个 Segment 内部使用的。
+
+* `concurrencyLevel`：并行级别、并发数、Segment 数。默认是16，也就是说 ConcurrentHashMap 默认有16个 Segment，所以理论上，最多同时支持16个线程并发写。这个值可以在初始化的时候设置为其他值，但是一旦初始化以后，它就不可以扩容了。最大值受MAX_SEGMENTS控制，为65535个。
+
+`new ConcurrentHashMap()` 无参进行初始化以后：
+
+（1）Segment数组的长度是16，并且segments[0]初始化了，其他segments[i]还是null，在使用之前需要调用ensureSegment()方法执行初始化
+
+（2）segments[i]的默认大小是2，也即HashEntry的默认大小是2，负载因子为0.75，得出初始阈值为1.5，也就插入第一个元素不会触发扩容，插入第二个进行一次扩容。
+
+**定位Segment**
+
+ConcurrentHashMap使用了分段锁Segment来维护不同段的数据，那么在插入和获取元素的时候，必须先通过算法首先定位到Segment上之后才可以在具体的HashEntry用类似HashMap找元素的方法来定位一个元素。
+
+
+
+#### put()—添加元素操作
+
+<img src="http://image.easyblog.top/1596464636809e8a0c99a-19f7-4b02-a40e-df25afb7672f.png" alt="img" style="zoom:67%;" />
+
+**put流程梳理：** 
+
+（1）首先检查value，如果value==null，抛出NPE；
+
+（2）根据hash值定位到Segment，定位segments[j]的算法是：**j=(hash>>>sgmentShift)&sgmentMask**，其实j就是hash值的低4位
+
+（3）获得到Segment后判断是否为null,如果是null，表示还没有初始化，那先调用ensureSegment()方法初始化Segment
+
+（4）最后，调用Segment对象的put方法存入键值对。
+
+* 4.1、首先通过父类ReentrantLock的tryLock()方法对每个Segment加锁，上锁成功之后继续执行，否则调用scanAndLockForPut()方法不断的调用tryLock()尝试获取锁，尝试的次数和CPU核数有关，单核CPU值尝试1次，多核CPU最多重试64次，如果重试结束还没有获取锁，那就阻塞等待锁； 
+* 4.2、确定HashEntry[i]的下标。`index = (tab.length - 1) & hash`; 
+* 4.3、如果当前HashEntry没有初始化，先初始化，并将键值对插入；
+* 4.4、已经初始化，遍历HashEntry链，有重复的，新值覆盖旧值，否则，插入； 
+* 4.5、**插入之后，判断是否需要扩容**，扩容：Segment[]是不能扩容的，只能扩容一个个Segment中的HashEntry[]的大小为原来的两倍
+
+
+
+#### get()—获取元素操作
+
+<img src="http://image.easyblog.top/15965148764775c348927-bf62-4713-8a0f-d8685f5d8f24.png" alt="img" style="zoom:50%;" />
+
+**get操作流程**： 
+
+（1）计算 hash值，
+
+（2）通过hash值找到 Segment数组中的下标。
+
+（3）再次根据 hash 找到每Segment内部的 HashEntry[]数组的下标。
+
+（4）遍历该数组位置处的链表，直到找到相等（内存地址相同或两个元素的hash值相同并且equals方法返回true）的 key。
+
+get 是不需要加锁的：原因是get方法是将共享变量（table）定义为volatile，让被修饰的变量对多个线程可见(即其中一个线程对变量进行了修改，会同步到主内存，其他线程也能获取到最新值)，允许一写多读的作。
+
+Segment的get操作实现非常简单和高效。**先经过一次hash()，然后使用散列值运算定位到Segment，在定位到聚义的元素的过程。**
+
+get操作的高效是因为整个get操作不需要加锁，为什么他不需要加锁呢？是**因为get方法中使用的共享变量都被定义成了volatile类型**，比如：统计当前Segment大小的count，和用于存储key-value的HashEntry。定义成volatile的变量能够在多个线程之间保证内存可见性，如果与多个线程读，它读取到的值一定是当前这个变量的最新值。
+
+
+
+#### size()—获取元素个数
+
+size()方法就是求当前ConcurrentHashMap中元素实际个数的方法，它是**弱一致性的**。方法的逻辑大致是：**首先他会使用不加锁的模式去尝试计算 ConcurrentHashMap 的 size，比较前后两次计算的结果，结果一致就认为当前没有元素加入或删除，计算的结果是准确的，然后返回此结果；如果尝试了三次之后结果还是不一致，它就会给每个 Segment 加上锁，然后计算 ConcurrentHashMap 的 size 返回。**
+
+<img src="https://image.easyblog.top/QQ%E6%88%AA%E5%9B%BE20210121205801.png" style="zoom:80%;" />
 
 
 
 
 
+### ConcurrentHashMap JDK1.8实现的原理是什么?
+
+JDK1.8的实现已经摒弃了Segment的概念，而是直接使用 **数组+链表+红黑树** 的数据结构来实现的，**并发控制使用的是CAS+synchronized**，jdk1.8版本的ConcurrentHashMap看起来就像是优化过之后线程安全的HashMap,虽然在JDK1.8中还能看到Segment的身影，但是已经简化了属性，只是为了兼容旧版本。下图是jdk1.8中ConcurrentHashMap的结构示意图：
+
+<img src="http://image.easyblog.top/15964512103041ffc1840-4e2e-49d0-b0f8-2d94c2726d63.jpg" alt="img"/>
+
+#### put()—添加元素操作
+
+**put()方法流程梳理：**
+
+（1）首先我们通过源码看到，jdk1.8中ConcurrentHashMap不允许key或value为null，如果你违反了就会报NPE。
+
+（2）之后获取到hash值，在之后会首先判断当前hash表是否被初始化了，因为jdk1.8中ConcurrentHashMap是懒惰初始化的，只有第一次put的时候才会初始化。初始化会调用initTable方法，该方法中使用CAS设置seizeCtl的值来保证线程安全。
+
+（3）如果哈希表已经初始化了，然后计算key的哈希桶的位置，如果在这个位置还是null，那就直接使用CAS设置新节点到桶的这个位置即可；定位桶的算法还是**i=(tab.length-1)&hash**
+
+（4）如果检查发现当前槽位的**头结点的hash值==-1**（标记为是ForwardingNode结点了），表示当前hash表正在扩容中，此时其他线程过去帮忙扩容;
+
+（5）如果当前hash表存在、(n-1)&hash 位子有元素了并且没有在扩容，那就是发生了哈希冲突，解决冲突之前首先对链表的头结点/红黑树的root结点上锁
+
+- 5.1、如果key的桶的位置还是链表，那就在链表的**尾部插入新的元素**，再次过程中还会统计链表的结点个数，存储在bitCount中，用于在插入之后判断是否需要扩容以及检查是否相同key的结点存在，如果存在那就执行值替换逻辑；
+- 5.2、如果key的桶的位置已经是红黑树了，那就把新的元素插入红黑树中
+
+（6）插入完毕之后会判断binCount的值是否已经大于等于树化阈值（TREEIFY_THRESHOLD=8）了，如果是，那就把链表转换为红黑树，不过最后转不转得成还要看哈希表的容量是不是大于MIN_TREEIFY_CAPACITY（64），如果没有达到只会扩容
+
+
+
+#### initTable()—初始化哈希表
+
+在put过程中如果是第一次put，此时hash表还没有初始化，因此需要首先初始化哈希表。初始化哈希表会调用initTable()方法，这个方法会使用CAS加锁，然后实例化一个hash表
+
+![](http://image.easyblog.top/168025111787210ca06a8-bf1e-4e9b-b2a5-90fd37970e04.png)
+
+
+
+#### get()—获取元素操作
+
+get()方法没有加锁，即可以并发的读，敢这么做重要是因为Node数组被volatile被修饰了，volatile保证了共享变量在多线程下的内存可见性，即其他线程只要一修改Node数组中的数据，get操作的线程马上就可以知道修改的数据。
+
+<img src="http://image.easyblog.top/15965397939966be09e6d-d8da-495f-b0ea-bc64c50fc780.png" alt="img" />
+
+get()方法逻辑梳理：
+
+（1）计算出key的hash值；
+
+（2）根据 hash 值找到哈希槽的位置：**(n - 1) & hash**
+
+（3）根据该位置处头节点的性质进行查找：
+
+* 1）如果该位置为 null，那么直接返回 null 就可以了
+* 2）如果该位置处的节点刚好就是我们需要的，返回该节点的值即可
+* 3）如果该位置节点的 hash 值小于 0，说明正在扩容，或者是红黑树，后面调用 find 接口，程序会根据上下文执行具体的方法。
+* 4）如果以上 3 条都不满足，那就是链表，进行遍历比对即可
+
+
+
+#### size()—获取元素的个数
+
+<img src="https://image.easyblog.top/QQ%E6%88%AA%E5%9B%BE20210121203722.png"/>
+
+ 
+
+#### transfer()—扩容操作
+
+扩容的逻辑比较复杂，这里不再贴出源码了，我们来捋一下关键流程就好了：
+
+- 首先扩容会传进来两个参数：旧哈希表和新哈希表（`Node<K,V>[] tab, Node<K,V>[] nextTab`），在第一个线程调用这个方法的时候新哈希表nextTab=null
+- **当线程判断nextTab=null之后，会new一个是旧hash表2倍大小的新哈希表**（`Node<K,V>[] nt = (Node<K,V>[])new Node<?,?>[n << 1];`）
+- **创建新哈希表完成之后就是元素结点的搬迁工作了**。这个过程中值的注意的是，**当一个线程把旧哈希表上桶中的元素搬迁到新的哈希表上之后或者这个桶中没有元素，它用一个ForwardingNode类型的结点挂在这个桶下，以此告诉其他线程这个桶位置已经被处理了，这样可以避免其他线程get或put时出现错误**
+- **还需要注意的是，在移动桶中元素的过程中，还是需要对链表和红黑树分别处理**，前者的判断依据是头结点的hash值大于等于0，后者的判断依据是头结点的hash值小于0并且头结点是TreeBin类的实例。
+
+
+
+### CopyOnWriteArrayList的实现原理?
+
+`CopyOnWriteArrayList` 是 Java 并发包中的一个线程安全的 List 实现，它的特点是写操作是通过复制一份新的数组来实现的，因此可以保证写操作的线程安全性，而读操作则可以并发执行。
+
+具体实现原理如下：
+
+1. 内部使用一个 `volatile` 修饰的数组来存储元素。在初始化时，`CopyOnWriteArrayList` 会创建一个空数组作为初始数组。当添加元素时，会将新元素添加到数组的末尾。
+2. 在进行写操作时，`CopyOnWriteArrayList` 首先会获取一个 `ReentrantLock` 锁，确保同一时刻只有一个线程进行写操作。
+3. 接着，会创建一个新的数组，并将原数组的元素复制到新数组中。因为新数组与原数组是不同的对象，所以写操作不会影响原数组。
+4. 写操作完成之后，`CopyOnWriteArrayList `会将新数组替换掉旧数组。由于 `volatile` 关键字的作用，所有线程都能立即看到数组的变化。
+5. 在进行读操作时，`CopyOnWriteArrayList` 直接读取当前数组的元素。因为当前数组不会发生变化，所以读操作是线程安全的。由于读操作与写操作是分离的，所以 `CopyOnWriteArrayList `可以支持高并发的读操作。
+
+总之，`CopyOnWriteArrayList` 是一种适用于读多写少的场景的线程安全 List 实现，通过写时复制的方式保证写操作的线程安全性，同时支持高并发的读操作。
+
+
+
+### CopyOnWriteArrayList有何缺陷，说说其应用场景?
+
+CopyOnWriteArrayList 有几个缺点：
+
+- 由于写操作的时候，需要拷贝数组，会消耗内存，如果原数组的内容比较多的情况下，可能导致young gc或者full gc
+- 不能用于实时读的场景，像拷贝数组、新增元素都需要时间，所以调用一个set操作后，读取到数据可能还是旧的,虽然CopyOnWriteArrayList 能做到最终一致性,但是还是没法满足实时性要求；
+
+
+
+### 阻塞队列有几种，分别都有哪些特性？
+
+阻塞队列（BlockingQueue）是一个支持两个附加操作的队列。这两个附加的操作是：在队列为空时，获取元素的线程会等待队列变为非空。当队列满时，存储元素的线程会等待队列可用。阻塞队列常用于生产者和消费者的场景，生产者是往队列里添加元素的线程，消费者是从队列里拿元素的线程。阻塞队列就是生产者存放元素的容器，而消费者也只从容器里拿元素。
+
+<img src="http://image.easyblog.top/1587444510867628c9aac-b66a-488b-8165-365de883ebf5.jpg" alt="img" style="zoom:30%;" />
+
+#### (1)、ArrayListBlockingQueue
+
+ArrayListBlockingQueue是一个用数组实现的有界阻塞队列，此队列按照先进先出（FIFO）的原则对元素进行排序。支持公平锁和非公平锁（默认情况下是非公平锁）。
+
+```java
+public ArrayBlockingQueue(int capacity) {
+    //默认使用的是非公平锁
+    this(capacity, false);
+}
+//通过boolean类型的参数可以控制使用公平锁还是非公平锁
+public ArrayBlockingQueue(int capacity, boolean fair) {
+    if (capacity <= 0)
+        throw new IllegalArgumentException();
+    this.items = new Object[capacity];
+    lock = new ReentrantLock(fair);
+    notEmpty = lock.newCondition();
+    notFull =  lock.newCondition();
+}
+```
+
+#### (2)、LinkedBlockingQueue
+
+LinkedBlockingQueue是一个用**单链表**实现的有界阻塞队列。此队列的默认长度和最大长度为`Integer.MAX_VALUE`。此队列按照先进先出的原则对元素进行排序。
+
+#### (3)、PriorityBlockingQueue
+
+一个支持线程优先级排序的无界队列，默认自然序进行排序，也可以自定义实现compareTo()方法来指定元素排序规则，不能保证同优先级元素的顺序。
+
+#### (4)、DelayQueue
+
+DelayQueue是一个支持延时获取元素的无界阻塞队列。队列基于PriorityBlockingQueue实现。队列中的元素必须实现Delayed接口，在创建元素是可以指定多久才能从队列中获取当前元素。DelayQueue可以用于 **缓存系统设计** 和 **定时任务调度** 这样的应用场景。
+
+#### (5)、SynchronousQueue
+
+SynchronousQueue是一个不存储元素的阻塞队列。每一个put操作必须等待一个take操作，否则不能继续添加元素。它支持公平访问队列。默认情况下线程采用非公共策略访问队列。**当使用公平锁的时候，等待的线程会采用先进先出的顺序访问队列**。
+
+```java
+//默认使用非公平锁
+public SynchronousQueue() {
+    this(false);
+}
+//通过boolean类型的参数可以控制使用公平锁还是非公平锁
+public SynchronousQueue(boolean fair) {
+    transferer = fair ? new TransferQueue<E>() : new TransferStack<E>();
+}
+```
+
+#### ( 6)、LinkedTransferQueue
+
+LinkedTransferQueue是一个由链表实现的无界阻塞Transfer队列。相对于其他阻塞队列，LinkedTransferQueue多了transfer和tryTransfer方法
+
+#### (7)、LinkedBlockingDeque
+
+LinkedBlockingDeque是一个由**双链表**实现的双向阻塞队列。队列头部和尾部都可以添加和移除元素，多线程并发时，可以将锁的竞争最多降到一半。
 
 
 
 ## 3.7 J.U.C原子类详解
+
+### 什么是CAS?
+
+CAS的全称为`Compare-And-Swap`，直译就是对比交换。是一条CPU的原子指令，其作用是让CPU先进行比较两个值是否相等，然后原子地更新某个位置的值，经过调查发现，其实现方式是基于硬件平台的汇编指令，就是说CAS是靠硬件实现的，JVM只是封装了汇编调用，那些AtomicInteger类便是使用了这些封装后的接口。   简单解释：CAS操作需要输入两个数值，一个旧值(期望操作前的值)和一个新值，在操作期间先比较下在旧值有没有发生变化，如果没有发生变化，才交换成新值，发生了变化则不交换。
+
+CAS操作是原子性的，所以多线程并发使用CAS更新数据时，可以不使用锁。JDK中大量使用了CAS来更新数据而防止加锁(synchronized 重量级锁)来保持原子更新。
+
+相信sql大家都熟悉，类似sql中的条件更新一样：update set id=3 from table where id=2。因为单条sql执行具有原子性，如果有多个线程同时执行此sql语句，只有一条能更新成功。
+
+
+
+### CAS会有哪些问题?
+
+CAS 方式为乐观锁，synchronized 为悲观锁。因此使用 CAS 解决并发问题通常情况下性能更优。
+
+但使用 CAS 方式也会有几个问题：
+
+- ABA问题
+
+因为CAS需要在操作值的时候，检查值有没有发生变化，比如没有发生变化则更新，但是如果一个值原来是A，变成了B，又变成了A，那么使用CAS进行检查时则会发现它的值没有发生变化，但是实际上却变化了。
+
+ABA问题的解决思路就是使用版本号。在变量前面追加上版本号，每次变量更新的时候把版本号加1，那么A->B->A就会变成1A->2B->3A。
+
+从Java 1.5开始，JDK的Atomic包里提供了一个类AtomicStampedReference来解决ABA问题。这个类的compareAndSet方法的作用是首先检查当前引用是否等于预期引用，并且检查当前标志是否等于预期标志，如果全部相等，则以原子方式将该引用和该标志的值设置为给定的更新值。
+
+- 循环时间长开销大
+
+自旋CAS如果长时间不成功，会给CPU带来非常大的执行开销。如果JVM能支持处理器提供的pause指令，那么效率会有一定的提升。pause指令有两个作用：第一，它可以延迟流水线执行命令(de-pipeline)，使CPU不会消耗过多的执行资源，延迟的时间取决于具体实现的版本，在一些处理器上延迟时间是零；第二，它可以避免在退出循环的时候因内存顺序冲突(Memory Order Violation)而引起CPU流水线被清空(CPU Pipeline Flush)，从而提高CPU的执行效率。
+
+- 只能保证一个共享变量的原子操作
+
+当对一个共享变量执行操作时，我们可以使用循环CAS的方式来保证原子操作，但是对多个共享变量操作时，循环CAS就无法保证操作的原子性，这个时候就可以用锁。
+
+
+
+### 阐述你对Unsafe类的理解?
+
+UnSafe类总体功能：
+
+![img](https://pdai.tech/images/thread/java-thread-x-atomicinteger-unsafe.png)
+
+Unsafe类可以用来直接访问和操作Java虚拟机中的内存，这包括直接修改对象的内部状态、分配内存、释放内存以及执行CAS（Compare-and-Swap）操作等。
+
+Unsafe类还可以用来执行本地方法调用，这允许Java代码与本地C或C++代码进行交互。
+
+
+
+
+
+# 四、Java IO
+
+## 4.1 IO 基础
+
+### 如何从数据传输方式理解IO流？
+
+从数据传输方式或者说是运输方式角度看，可以将 IO 类分为 `字节流` 和 `字符流`:
+
+1. **`字节流`**, 字节流读取单个字节，字符流读取单个字符(一个字符根据编码的不同，对应的字节也不同，如 UTF-8 编码中文汉字是 3 个字节，GBK编码中文汉字是 2 个字节。)
+2. **`字符流`**, 字节流用来处理二进制文件(图片、MP3、视频文件)，字符流用来处理文本文件(可以看做是特殊的二进制文件，使用了某种编码，人可以阅读)。
+
+针对不同字节流和字符流，Java提供了对应的IO类体系：
+
+* 字节流
+
+![img](https://pdai.tech/images/io/java-io-category-1.png)
+
+* 字符流
+
+![img](https://pdai.tech/images/io/java-io-category-2.png)
+
+### Java IO设计上使用了什么设计模式？
+
+**装饰者模式**： 所谓装饰，就是把这个装饰者套在被装饰者之上，从而动态扩展被装饰者的功能。
+
+- 以 InputStream 为例
+  - InputStream 是抽象组件；
+  - FileInputStream 是 InputStream 的子类，属于具体组件，提供了字节流的输入操作；
+  - FilterInputStream 属于抽象装饰者，装饰者用于装饰组件，为组件提供额外的功能。例如 BufferedInputStream 为 FileInputStream 提供缓存的功能。
+
+![image](https://pdai.tech/images/pics/DP-Decorator-java.io.png)
+
+实例化一个具有缓存功能的字节流对象时，只需要在 FileInputStream 对象上再套一层 BufferedInputStream 对象即可。
+
+```java
+FileInputStream fileInputStream = new FileInputStream(filePath);
+BufferedInputStream bufferedInputStream = new BufferedInputStream(fileInputStream);
+```
+
+DataInputStream 装饰者提供了对更多数据类型进行输入的操作，比如 int、double 等基本类型。
+
+
+
+## 4.2 5种IO模型
+
+### 什么是阻塞？什么是同步？
+
+- **阻塞IO 和 非阻塞IO**
+
+这两个概念是**程序级别**的。主要描述的是程序请求操作系统IO操作后，如果IO资源没有准备好，那么程序该如何处理的问题: 前者等待；后者继续执行(并且使用线程一直轮询，直到有IO资源准备好了)
+
+- **同步IO 和 非同步IO**
+
+这两个概念是**操作系统级别**的。主要描述的是操作系统在收到程序请求IO操作后，如果IO资源没有准备好，该如何响应程序的问题: 前者不响应，直到IO资源准备好以后；后者返回一个标记(好让程序和自己知道以后的数据往哪里通知)，当IO资源准备好以后，再用事件机制返回给程序。
+
+
+
+### 什么是Linux的IO模型？
+
+网络IO的本质是socket的读取，socket在linux系统被抽象为流，IO可以理解为对流的操作。刚才说了，对于一次IO访问（以read举例），**数据会先被拷贝到操作系统内核的缓冲区中，然后才会从操作系统内核的缓冲区拷贝到应用程序的地址空间**。所以说，当一个read操作发生时，它会经历两个阶段：
+
+- 第一阶段：等待数据准备 (Waiting for the data to be ready)。
+- 第二阶段：将数据从内核拷贝到进程中 (Copying the data from the kernel to the process)。
+
+对于socket流而言，
+
+- 第一步：通常涉及等待网络上的数据分组到达，然后被复制到内核的某个缓冲区。
+- 第二步：把数据从内核缓冲区复制到应用进程缓冲区。
+
+网络应用需要处理的无非就是两大类问题，网络IO，数据计算。相对于后者，网络IO的延迟，给应用带来的性能瓶颈大于后者。网络IO的模型大致有如下几种：
+
+1. 同步阻塞IO（bloking IO）
+2. 同步非阻塞IO（non-blocking IO）
+3. 多路复用IO（multiplexing IO）
+4. 信号驱动式IO（signal-driven IO）
+5. 异步IO（asynchronous IO）
+
+![img](https://pdai.tech/images/io/java-io-compare.png)
+
+#### 什么是同步阻塞IO？
+
+应用进程被阻塞，直到数据复制到应用进程缓冲区中才返回。
+
+![img](https://pdai.tech/images/io/java-io-model-0.png)
+
+
+
+#### 什么是同步非阻塞IO？
+
+应用进程执行系统调用之后，内核返回一个错误码。应用进程可以继续执行，但是需要不断的执行系统调用来获知 I/O 是否完成，这种方式称为轮询(polling)。
+
+![img](https://pdai.tech/images/io/java-io-model-1.png)
+
+#### 什么是多路复用IO？
+
+系统调用可能是由多个任务组成的，所以可以拆成多个任务，这就是多路复用。
+
+使用 `select` 或者 `poll` 等待数据，并且可以等待多个套接字中的任何一个变为可读，这一过程会被阻塞，当某一个套接字可读时返回。之后再使用 `recvfrom` 把数据从内核复制到进程中。
+
+它可以让单个进程具有处理多个 I/O 事件的能力。又被称为 Event Driven I/O，即事件驱动 I/O。
+
+![img](https://pdai.tech/images/io/java-io-model-2.png)
+
+
+
+##### 有哪些多路复用IO实现？
+
+目前流程的多路复用IO实现主要包括四种: `select`、`poll`、`epoll`、`kqueue`。下表是他们的一些重要特性的比较:
+
+| IO模型 | 相对性能 | 关键思路         | 操作系统      | JAVA支持情况                                                 |
+| ------ | -------- | ---------------- | ------------- | ------------------------------------------------------------ |
+| select | 较高     | Reactor          | windows/Linux | 支持,Reactor模式(反应器设计模式)。Linux操作系统的 kernels 2.4内核版本之前，默认使用select；而目前windows下对同步IO的支持，都是select模型 |
+| poll   | 较高     | Reactor          | Linux         | Linux下的JAVA NIO框架，Linux kernels 2.6内核版本之前使用poll进行支持。也是使用的Reactor模式 |
+| epoll  | 高       | Reactor/Proactor | Linux         | Linux kernels 2.6内核版本及以后使用epoll进行支持；Linux kernels 2.6内核版本之前使用poll进行支持；另外一定注意，由于Linux下没有Windows下的IOCP技术提供真正的 异步IO 支持，所以Linux下使用epoll模拟异步IO |
+| kqueue | 高       | Proactor         | Linux         | 目前JAVA的版本不支持                                         |
+
+多路复用IO技术最适用的是“高并发”场景，所谓高并发是指1毫秒内至少同时有上千个连接请求准备好。其他情况下多路复用IO技术发挥不出来它的优势。另一方面，使用JAVA NIO进行功能实现，相对于传统的Socket套接字实现要复杂一些，所以实际应用中，需要根据自己的业务需求进行技术选择。
+
+
+
+#### 什么是信号驱动IO？
+
+应用进程使用 `sigaction` 系统调用，内核立即返回，应用进程可以继续执行，也就是说等待数据阶段应用进程是非阻塞的。内核在数据到达时向应用进程发送 SIGIO 信号，应用进程收到之后在信号处理程序中调用 `recvfrom `将数据从内核复制到应用进程中。
+
+相比于非阻塞式 I/O 的轮询方式，信号驱动 I/O 的 CPU 利用率更高。
+
+![img](https://pdai.tech/images/io/java-io-model-3.png)
+
+
+
+#### 什么是异步IO？
+
+相对于同步IO，异步IO不是顺序执行。用户进程进行`aio_read`系统调用之后，无论内核数据是否准备好，都会直接返回给用户进程，然后用户态进程可以去做别的事情。等到socket数据准备好了，内核直接复制数据给进程，然后从内核向进程发送通知。IO两个阶段，进程都是非阻塞的。
+
+![img](https://pdai.tech/images/io/java-io-model-4.png)
+
+Linux提供了AIO库函数实现异步，但是用的很少。目前有很多开源的异步IO库，例如`libevent`、`libev`、`libuv`
+
+
+
+### 什么是Reactor模型？
+
+大多数网络框架都是基于Reactor模型进行设计和开发，Reactor模型基于事件驱动，特别适合处理海量的I/O事件。
+
+ 
+
+#### **传统的IO模型**？
+
+这种模式是传统设计，每一个请求到来时，大致都会按照：请求读取->请求解码->服务执行->编码响应->发送答复 这个流程去处理。
+
+![img](https://pdai.tech/images/io/java-io-reactor-1.png)
+
+服务器会分配一个线程去处理，如果请求暴涨起来，那么意味着需要更多的线程来处理该请求。若请求出现暴涨，线程池的工作线程数量满载那么其它请求就会出现等待或者被抛弃。若每个小任务都可以使用非阻塞的模式，然后基于异步回调模式。这样就大大提高系统的吞吐量，这便引入了Reactor模型。
+
+
+
+#### Reactor 模型？
+
+- **Reactor模型中定义的三种角色**：
+
+1. **Reactor**：负责监听和分配事件，将I/O事件分派给对应的Handler。新的事件包含连接建立就绪、读就绪、写就绪等。
+2. **Acceptor**：处理客户端新连接，并分派请求到处理器链中。
+3. **Handler**：将自身与事件绑定，执行非阻塞读/写任务，完成channel的读入，完成处理业务逻辑后，负责将结果写出channel。可用资源池来管理。
+
+
+
+##### **单Reactor单线程模型**
+
+Reactor线程负责多路分离套接字，accept新连接，并分派请求到handler。Redis使用单Reactor单进程的模型。
+
+![img](https://pdai.tech/images/io/java-io-reactor-2.png)
+
+消息处理流程：
+
+1. Reactor对象通过select监控连接事件，收到事件后通过dispatch进行转发。
+2. 如果是连接建立的事件，则由acceptor接受连接，并创建handler处理后续事件。
+3. 如果不是建立连接事件，则Reactor会分发调用Handler来响应。
+4. handler会完成read->业务处理->send的完整业务流程。
+
+
+
+##### 单Reactor多线程模型
+
+将handler的处理池化。
+
+![img](https://pdai.tech/images/io/java-io-reactor-3.png)
+
+
+
+##### **多Reactor多线程模型**
+
+主从Reactor模型： 主Reactor用于响应连接请求，从Reactor用于处理IO操作请求，读写分离了。
+
+![img](https://pdai.tech/images/io/java-io-reactor-4.png)
+
+
+
+### 什么是Java NIO？
+
+Java NIO主要有三大核心部分：Channel(通道)，Buffer(缓冲区), Selector。**传统IO基于字节流和字符流进行操作**，而**NIO基于Channel和Buffer(缓冲区)进行操作**，数据总是从通道读取到缓冲区中，或者从缓冲区写入到通道中。Selector(选择区)用于监听多个通道的事件（比如：连接打开，数据到达）。因此，单个线程可以监听多个数据通道。
+
+NIO和传统IO（一下简称IO）之间第一个最大的区别是，IO是面向流的，NIO是面向缓冲区的。
+
+![img](https://pdai.tech/images/io/java-io-nio-x.png)
+
+1. `Channel`：表示一个可以进行读写操作的对象，类似于传统的流，但可以同时进行读写操作。
+2. `Buffer`：用于存储数据，可以在 Channel 和应用程序之间传递数据。
+3. `Selector`：用于监控多个 Channel 的状态，可以同时处理多个 Channel 的 I/O 操作，从而实现非阻塞 I/O。
+
+当一个 Channel 注册到 Selector 中时，Selector 会开始监听该 Channel 的状态。如果 Channel 可读或可写，Selector 就会通知应用程序进行读写操作。此时应用程序可以使用 Buffer 读取或写入数据，然后再将 Buffer 写入到 Channel 中。
+
+由于 Selector 可以同时监控多个 Channel 的状态，因此可以实现高效的多路复用，从而处理大量的并发连接。与传统的阻塞 I/O 不同，NIO 可以实现非阻塞的 I/O 操作，当没有数据可读或可写时，程序不会被阻塞，可以更高效地利用系统资源，同时可以更好地处理并发连接。
+
+
+
+## 4.3 零拷贝
+
+### 传统的IO存在什么问题？为什么引入零拷贝的？
+
+如果服务端要提供文件传输的功能，我们能想到的最简单的方式是：将磁盘上的文件读取出来，然后通过网络协议发送给客户端。
+
+传统 I/O 的工作方式是，数据读取和写入是从用户空间到内核空间来回复制，而内核空间的数据是通过操作系统层面的 I/O 接口从磁盘读取（`read()`）或写入（`write()`）。
+
+![img](https://pdai.tech/images/io/java-io-copy-3.png)
+
+首先，**期间共发生了 4 次用户态与内核态的上下文切换**，因为发生了两次系统调用，一次是 read() ，一次是 write()，每次系统调用都得先从用户态切换到内核态，等内核完成任务后，再从内核态切换回用户态。
+
+上下文切换到成本并不小，一次切换需要耗时几十纳秒到几微秒，虽然时间看上去很短，但是在高并发的场景下，这类时间容易被累积和放大，从而影响系统的性能。
+
+其次，还发生了 **4 次数据拷贝**，其中**两次是 DMA 的拷贝**，另外**两次则是通过 CPU 拷贝**的，下面说一下这个过程：
+
+- **第一次拷贝**，把磁盘上的数据拷贝到操作系统内核的缓冲区里，这个拷贝的过程是通过 DMA 搬运的。
+- **第二次拷贝**，把内核缓冲区的数据拷贝到用户的缓冲区里，于是我们应用程序就可以使用这部分数据了，这个拷贝到过程是由 CPU 完成的。
+- **第三次拷贝**，把刚才拷贝到用户的缓冲区里的数据，再拷贝到内核的 socket 的缓冲区里，这个过程依然还是由 CPU 搬运的。
+- **第四次拷贝**，把内核的 socket 缓冲区里的数据，拷贝到网卡的缓冲区里，这个过程又是由 DMA 搬运的。
+
+回过头看这个文件传输的过程，我们只是搬运一份数据，结果却搬运了 4 次，过多的数据拷贝无疑会消耗 CPU 资源，大大降低了系统性能。
+
+这种简单又传统的文件传输方式，存在冗余的上文切换和数据拷贝，在高并发系统里是非常糟糕的，多了很多不必要的开销，会严重影响系统性能。
+
+所以，**要想提高文件传输的性能，就需要减少「用户态与内核态的上下文切换」和「内存拷贝」的次数**。
+
+
+
+### mmap + write怎么实现的零拷贝？
+
+在前面我们知道，read() 系统调用的过程中会把内核缓冲区的数据拷贝到用户的缓冲区里，于是为了减少这一步开销，我们可以用 mmap() 替换 read() 系统调用函数。
+
+mmap() 系统调用函数会直接把内核缓冲区里的数据「映射」到用户空间，这样，操作系统内核与用户空间就不需要再进行任何的数据拷贝操作。
+
+![img](https://pdai.tech/images/io/java-io-copy-4.png)
+
+
+
+具体过程如下：
+
+- 应用进程调用了 mmap() 后，DMA 会把磁盘的数据拷贝到内核的缓冲区里。接着，应用进程跟操作系统内核「共享」这个缓冲区；
+- 应用进程再调用 write()，操作系统直接将内核缓冲区的数据拷贝到 socket 缓冲区中，这一切都发生在内核态，由 CPU 来搬运数据；
+- 最后，把内核的 socket 缓冲区里的数据，拷贝到网卡的缓冲区里，这个过程是由 DMA 搬运的。
+
+我们可以得知，通过使用 mmap() 来代替 read()， 可以减少一次数据拷贝的过程。
+
+但这还不是最理想的零拷贝，因为仍然需要通过 CPU 把内核缓冲区的数据拷贝到 socket 缓冲区里，而且仍然需要 4 次上下文切换，因为系统调用还是 2 次。
+
+
+
+### sendfile怎么实现的零拷贝？
+
+在 Linux 内核版本 2.1 中，提供了一个专门发送文件的系统调用函数 sendfile()，函数形式如下：
+
+```c
+#include <sys/socket.h>
+ssize_t sendfile(int out_fd, int in_fd, off_t *offset, size_t count);
+```
+
+它的前两个参数分别是`目的端`和`源端`的文件描述符，后面两个参数是`源端的偏移量`和`复制数据的长度`，返回值是实际复制数据的长度。
+
+首先，它可以替代前面的 read() 和 write() 这两个系统调用，这样就可以减少一次系统调用，也就减少了 2 次上下文切换的开销。
+
+其次，该系统调用，可以直接把内核缓冲区里的数据拷贝到 socket 缓冲区里，不再拷贝到用户态，这样就只有 2 次上下文切换，和 3 次数据拷贝。如下图：
+
+![img](https://pdai.tech/images/io/java-io-copy-5.png)
+
+但是这还不是真正的零拷贝技术，如果网卡支持 SG-DMA（**The Scatter-Gather Direct Memory Access**）技术（和普通的 DMA 有所不同），我们可以进一步减少通过 CPU 把内核缓冲区里的数据拷贝到 socket 缓冲区的过程。
+
+你可以在你的 Linux 系统通过下面这个命令，查看网卡是否支持 scatter-gather 特性：
+
+```sh
+$ ethtool -k eth0 | grep scatter-gather
+scatter-gather: on
+```
+
+于是，从 Linux 内核 2.4 版本开始起，对于支持网卡支持 SG-DMA 技术的情况下， sendfile() 系统调用的过程发生了点变化，具体过程如下：
+
+- 第一步，通过 DMA 将磁盘上的数据拷贝到内核缓冲区里；
+- 第二步，缓冲区描述符和数据长度传到 socket 缓冲区，这样网卡的 SG-DMA 控制器就可以直接将内核缓存中的数据拷贝到网卡的缓冲区里，此过程不需要将数据从操作系统内核缓冲区拷贝到 socket 缓冲区中，这样就减少了一次数据拷贝；
+
+所以，这个过程之中，只进行了 2 次数据拷贝，如下图：
+
+![img](https://pdai.tech/images/io/java-io-copy-6.png)
+
+这就是所谓的**零拷贝（Zero-copy）技术，因为我们没有在内存层面去拷贝数据，也就是说全程没有通过 CPU 来搬运数据，所有的数据都是通过 DMA 来进行传输的**。
+
+零拷贝技术的文件传输方式相比传统文件传输的方式，**减少了 2 次上下文切换和数据拷贝次数，只需要 2 次上下文切换和数据拷贝次数，就可以完成文件的传输，而且 2 次的数据拷贝过程，都不需要通过 CPU，2 次都是由 DMA 来搬运**。
+
+
+
+# 五、JVM和调优
