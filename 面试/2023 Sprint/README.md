@@ -4061,3 +4061,347 @@ ZGC工作过程整体可以分为四个阶段：
 
 
 
+
+
+
+
+# 六、Spring
+
+## 6.1 Spring IOC
+
+### 谈谈对于 Spring IoC 的了解？
+
+`IOC（Inversion Of Controll，控制反转）`是一种设计思想，就是将原本在程序中手动创建对象的控制权，交给IOC容器来管理，并由IOC容器完成对象的注入。这样可以很大程度上简化应用的开发，把应用从复杂的依赖关系中解放出来。IOC容器就像是一个工厂一样，当我们需要创建一个对象的时候，只需要配置好配置文件/注解即可，完全不用考虑对象是如何被创建出来的。
+
+
+
+
+
+### 什么是Spring Bean?
+
+简单来说，Bean 代指的就是那些被 IoC 容器所管理的对象。
+
+我们需要告诉 IoC 容器帮助我们管理哪些对象，这个是通过配置元数据来定义的。配置元数据可以是 XML 文件、注解或者 Java 配置类。
+
+
+
+### 将一个类声明为 Bean 的注解有哪些?
+
+- `@Component` ：通用的注解，可标注任意类为 `Spring` 组件。如果一个 Bean 不知道属于哪个层，可以使用`@Component` 注解标注。
+- `@Repository` : 对应持久层即 Dao 层，主要用于数据库相关操作。
+- `@Service` : 对应服务层，主要涉及一些复杂的逻辑，需要用到 Dao 层。
+- `@Controller` : 对应 Spring MVC 控制层，主要用于接受用户请求并调用 `Service` 层返回数据给前端页面。
+
+
+
+### @Component 和 @Bean 的区别是什么？
+
+- `@Component` 注解作用于类，而`@Bean`注解作用于方法。
+- `@Component`通常是通过类路径扫描来自动侦测以及自动装配到 Spring 容器中（我们可以使用 `@ComponentScan` 注解定义要扫描的路径从中找出标识了需要装配的类自动装配到 Spring 的 bean 容器中）。`@Bean` 注解通常是我们在标有该注解的方法中定义产生这个 bean,`@Bean`告诉了 Spring 这是某个类的实例，当我需要用它的时候还给我。
+- `@Bean` 注解比 `@Component` 注解的自定义性更强，而且很多地方我们只能通过 `@Bean` 注解来注册 bean。比如当我们引用第三方库中的类需要装配到 `Spring`容器时，则只能通过 `@Bean`来实现。
+
+
+
+### 注入 Bean 的注解有哪些？
+
+Spring 内置的 `@Autowired` 以及 JDK 内置的 `@Resource` 和 `@Inject` 都可以用于注入 Bean。
+
+| Annotaion    | Package                            | Source       |
+| ------------ | ---------------------------------- | ------------ |
+| `@Autowired` | `org.springframework.bean.factory` | Spring 2.5+  |
+| `@Resource`  | `javax.annotation`                 | Java JSR-250 |
+| `@Inject`    | `javax.inject`                     | Java JSR-330 |
+
+`@Autowired` 和`@Resource`使用的比较多一些。
+
+
+
+### @Autowired 和 @Resource 注解的区别
+
+- `@Autowired` 是 Spring 提供的注解，`@Resource` 是 JDK 提供的注解。
+- `Autowired` 默认的注入方式为`byType`（根据类型进行匹配），`@Resource`默认注入方式为 `byName`（根据名称进行匹配）。
+- 当一个接口存在多个实现类的情况下，`@Autowired` 和`@Resource`都需要通过名称才能正确匹配到对应的 Bean。`Autowired` 可以通过 `@Qualifier` 注解来显式指定名称，`@Resource`可以通过 `name` 属性来显式指定名称。
+
+
+
+### Bean 的作用域有哪些?
+
+Spring 中 Bean 的作用域通常有下面几种：
+
+- **`singleton`** : IoC 容器中只有唯一的 bean 实例。Spring 中的 bean 默认都是单例的，是对单例设计模式的应用。
+- **`prototype`** : 每次获取都会创建一个新的 bean 实例。也就是说，连续 `getBean()` 两次，得到的是不同的 Bean 实例。
+- **`request`** （仅 Web 应用可用）: 每一次 HTTP 请求都会产生一个新的 bean（请求 bean），该 bean 仅在当前 HTTP request 内有效。
+- **`session`** （仅 Web 应用可用） : 每一次来自新 session 的 HTTP 请求都会产生一个新的 bean（会话 bean），该 bean 仅在当前 HTTP session 内有效。
+- **`application/global-session`** （仅 Web 应用可用）： 每个 Web 应用在启动时创建一个 Bean（应用 Bean），该 bean 仅在当前应用启动时间内有效。
+- **`websocket`** （仅 Web 应用可用）：每一次 WebSocket 会话产生一个新的 bean。
+
+
+
+**如何配置Bean的作用域呢？**
+
+```java
+@Bean
+@Scope(value = ConfigurableBeanFactory.SCOPE_PROTOTYPE)
+public Person personPrototype() {
+    return new Person();
+}
+```
+
+
+
+### 单例 Bean 的线程安全问题？
+
+对于单例Bean，所有线程都共享一个单例实例Bean，因此是存在资源的竞争。
+
+如果单例Bean 是一个无状态Bean，也就是线程中的操作不会对Bean的成员执行**「查询」**以外的操作，那么这个单例Bean是线程安全的。比如Spring mvc 的 Controller、Service、Dao等，这些Bean大多是无状态的，只关注于方法本身。
+
+对于Spring 单例 Bean的下车安全，常见的有两种解决办法：
+
+1. 在 Bean 中尽量避免定义可变的成员变量。
+2. 在类中定义一个 `ThreadLocal` 成员变量，将需要的可变成员变量保存在 `ThreadLocal` 中（推荐的一种方式）。
+
+
+
+> **spring单例，为什么controller、service和dao确能保证线程安全？**
+>
+> Controller、Service、DAO本身并不是线程安全，如果只是调用里面的方法，而且多线程调用一个实例的方法，会在内存中复制变量，这是自己的线程的工作内存，是安全的。（这一点参考JVM栈的共工作原理）
+
+
+
+### Bean 的生命周期?
+
+![Spring Bean 生命周期](https://images.xiaozhuanlan.com/photo/2019/24bc2bad3ce28144d60d9e0a2edf6c7f.jpg)
+
+* Bean 容器找到配置文件中 Spring Bean 的定义。
+* Bean 容器利用 Java 反射创建 Bean 的实例。
+  * 如果涉及到一些属性值利用 `set()`方法设置一些属性值。
+  * 如果 Bean 实现了 `BeanNameAware` 接口，调用 `setBeanName()`方法，传入 Bean 的名字。
+  * 如果 Bean 实现了 `BeanClassLoaderAware` 接口，调用 `setBeanClassLoader()`方法，传入 `ClassLoader`对象的实例。
+  * 如果 Bean 实现了 `BeanFactoryAware` 接口，调用 `setBeanFactory()`方法，传入 `BeanFactory`对象的实例。
+  * 与上面的类似，如果实现了其他 `*Aware`接口，就调用相应的方法。
+* 如果有和加载这个 Bean 的 Spring 容器相关的 `BeanPostProcessor` 对象，执行`postProcessBeforeInitialization()` 方法
+
+* 如果 Bean 实现了`InitializingBean`接口，执行`afterPropertiesSet()`方法。
+
+* 如果 Bean 在配置文件中的定义包含 init-method 属性，执行指定的方法。
+
+* 如果有和加载这个 Bean 的 Spring 容器相关的 `BeanPostProcessor` 对象，执行`postProcessAfterInitialization()` 方法
+
+* 当要销毁 Bean 的时候，如果 Bean 实现了 `DisposableBean` 接口，执行 `destroy()` 方法。
+
+* 当要销毁 Bean 的时候，如果 Bean 在配置文件中的定义包含 `destroy-method` 属性，执行指定的方法。
+
+
+
+## 6.2 Spring AOP
+
+### 谈谈对于 AOP 的了解？
+
+`AOP（Aspect-Oriented Programming，面向切面编程）`能够将那些与业务无关，却为业务模块所共同调用的逻辑或责任（例如事务处理、日志管理、权限控制等）封装起来，便于减少系统的重复代码，降低模块间的耦合度，并有利于未来的可扩展性和可维护性。**AOP的核心思想是基于代理思想，对目标对象创建代理对象，在不修改原目标对象的情况下，通过代理对象，调用增强功能代码，从而对原有业务方法的功能进行增强**。
+
+Spring AOP是基于动态代理的，如果需要代理的对象实现了某个接口，那么Spring AOP就会使用`JDK动态代理`去创建代理对象了；如果需要代理的对象没后接口，只有具体的类就无法使用JDK动态代理，此时Spring AOP会使用`CGLib动态代理`来创建代理对象。
+
+![SpringAOPProcess](https://oss.javaguide.cn/github/javaguide/system-design/framework/spring/230ae587a322d6e4d09510161987d346.jpeg)
+
+当然也可以使用`AspectJ`，Spring AOP中已经集成了AspectJ，AspectJ应该算得上是Java生态系统中最完整的AOP框架了。使用AOP之后我们可以把一些通用功能抽象出来，在需要用到的地方直接使用即可，这样可以大大简化代码量。我们需要增加新功能也方便，提高了系统的扩展性。日志功能、事务管理和权限管理等场景都用到了AOP。
+
+
+
+### AOP 有哪些实现方式？
+
+实现 AOP 的技术，主要分为两大类：
+
+- **静态代理**
+
+   指使用 AOP 框架提供的命令进行编译，从而在编译阶段就可生成 AOP 代理类，因此也称为编译时增强； 
+
+  - 编译时编织（特殊编译器实现），典型的实现比如：AspectJ
+  - 类加载时编织（特殊的类加载器实现）。
+
+- **动态代理**
+
+   在运行时在内存中“临时”生成 AOP 动态代理类，因此也被称为运行时增强。 
+
+  - JDK 动态代理 
+    - JDK Proxy 是 Java 语言自带的功能，无需通过加载第三方类实现；
+    - Java 对 JDK Proxy 提供了稳定的支持，并且会持续的升级和更新，Java 8 版本中的 JDK Proxy 性能相比于之前版本提升了很多；
+    - JDK Proxy 是通过拦截器加反射的方式实现的；
+    - JDK Proxy 只能代理实现接口的类；
+    - JDK Proxy 实现和调用起来比较简单；
+  - CGLIB 
+    - CGLib 是第三方提供的工具，基于 ASM 实现的，性能比较高；
+    - CGLib 无需通过接口来实现，它是针对类实现代理，主要是对指定的类生成一个子类，它是通过实现子类的方式来完成调用的。
+
+
+
+### AspectJ 定义的通知类型有哪些？
+
+- **Before**（前置通知）：目标对象的方法调用之前触发
+- **After** （后置通知）：目标对象的方法调用之后触发
+- **AfterReturning**（返回通知）：目标对象的方法调用完成，在返回结果值之后触发
+- **AfterThrowing**（异常通知） ：目标对象的方法运行中抛出 / 触发异常后触发。AfterReturning 和 AfterThrowing 两者互斥。如果方法调用成功无异常，则会有返回值；如果方法抛出了异常，则不会有返回值。
+- **Around** （环绕通知）：编程式控制目标对象的方法调用。环绕通知是所有通知类型中可操作范围最大的一种，因为它可以直接拿到目标对象，以及要执行的方法，所以环绕通知可以任意的在目标对象的方法调用前后搞事，甚至不调用目标对象的方法
+
+
+
+### 谈谈你对CGLib的理解？
+
+JDK 动态代理机制只能代理实现接口的类，一般没有实现接口的类不能进行代理。使用 CGLib 实现动态代理，完全不受代理类必须实现接口的限制。
+
+CGLib 的原理是对指定目标类生成一个子类，并覆盖其中方法实现增强，但因为采用的是继承，所以不能对 final 修饰的类进行代理。
+
+
+
+## 6.3 Spring MVC
+
+### 谈谈对Spring MVC的了解？
+
+MVC 是模型(Model)、视图(View)、控制器(Controller)的简写，其核心思想是通过将业务逻辑、数据、显示分离来组织代码。
+
+![img](https://oss.javaguide.cn/java-guide-blog/image-20210809181452421.png)
+
+MVC 是一种设计模式，Spring MVC 是一款很优秀的 MVC 框架。Spring MVC 可以帮助我们进行更简洁的 Web 层的开发，并且它天生与 Spring 框架集成。Spring MVC 下我们一般把后端项目分为 Service 层（处理业务）、Dao 层（数据库操作）、Entity 层（实体类）、Controller 层(控制层，返回数据给前台页面)。
+
+
+
+### Spring MVC 的核心组件有哪些？
+
+Spring合并组件有以下5个：
+
+- **`DispatcherServlet`** ：**核心的中央处理器**，负责接收请求、分发，并给予客户端响应。
+- **`HandlerMapping`** ：**处理器映射器**，根据 uri 去匹配查找能处理的 `Handler` ，并会将请求涉及到的拦截器和 `Handler` 一起封装。
+- **`HandlerAdapter`** ：**处理器适配器**，根据 `HandlerMapping` 找到的 `Handler` ，适配执行对应的 `Handler`；
+- **`Handler`** ：**请求处理器**，处理实际请求的处理器，通常就是程序员编写的controller方法。
+- **`ViewResolver`** ：**视图解析器**，根据 `Handler` 返回的逻辑视图 / 视图，解析并渲染真正的视图，并传递给 `DispatcherServlet` 响应客户端。
+
+
+
+### Spring MVC的工作流程？
+
+![img](http://image.easyblog.top/1597936663684c9fe5f02-c484-4866-baf1-88e4a152b2a6.png)
+
+**流程说明（重要）：**
+
+1. 客户端（浏览器）发出请求，`DispathcherServlet`获取到请求
+
+2. `DispatcherServlet`根据请求信息调用 `HandlerMapping`。`HandlerMapping` 根据 uri 去匹配查找能处理的 `Handler`（也就是我们平常说的 `Controller` 控制器） ，并会将请求涉及到的`拦截器`和 `Handler` 一起封装成`执行链(HandlerExecutionChain)`返回。
+3. `DispatcherServlet` 调用 `HandlerAdapter`适配执行 `Handler` 。
+4. `Handler` 完成对用户请求的处理后，会返回一个 `ModelAndView` 对象给`DispatcherServlet`， `ModelAndView` 顾名思义，包含了数据模型以及相应的视图的信息。`Model` 是返回的数据对象，`View` 是个逻辑上的 `View`。
+5. `ViewResolver` 会根据逻辑 `View` 查找实际的 `View`，比如当 Spring MVC 接收到 application/json 类型的响应请求时，它会查找合适的视图解析器，根据配置文件中的配置，找到适合处理该类型响应的视图解析器。Spring MVC 默认使用的是 `MappingJackson2JsonView` 视图解析器，它会将 Java 对象转换成 JSON 字符串并返回。
+6. `DispatcherServlet` 进行视图渲染 （视图渲染将模型数据(在ModelAndView对象中)填充到response域）
+7. `DispatcherServlet`返回响应给请求者（浏览器）
+
+
+
+### 统一异常处理怎么做？
+
+推荐使用注解的方式统一异常处理，具体会使用到 `@ControllerAdvice` + `@ExceptionHandler` 这两个注解 。
+
+```java
+@ControllerAdvice
+@ResponseBody
+public class GlobalExceptionHandler {
+
+    @ExceptionHandler(BaseException.class)
+    public ResponseEntity<?> handleAppException(BaseException ex, HttpServletRequest request) {
+      //......
+    }
+
+    @ExceptionHandler(value = ResourceNotFoundException.class)
+    public ResponseEntity<ErrorReponse> handleResourceNotFoundException(ResourceNotFoundException ex, HttpServletRequest request) {
+      //......
+    }
+}
+```
+
+这种异常处理方式下，会给所有或者指定的 `Controller` 织入异常处理的逻辑（AOP），当 `Controller` 中的方法抛出异常的时候，由被`@ExceptionHandler` 注解修饰的方法进行处理。
+
+
+
+## 6.4 Spring 事务
+
+### Spring 管理事务的方式有几种？
+
+- **编程式事务** ： 在代码中硬编码(不推荐使用) : 通过 `TransactionTemplate`或者 `TransactionManager` 手动管理事务，实际应用中很少使用，但是对于理解 Spring 事务管理原理有帮助。
+- **声明式事务** ： 在 XML 配置文件中配置或者基于注解（推荐使用） : 实际是通过 AOP 实现（基于`@Transactional` 的全注解方式使用最多）
+
+
+
+### Spring 事务中哪几种事务传播行为?
+
+**事务传播行为是为了解决业务层方法之间互相调用的事务问题**。
+
+当事务方法被另一个事务方法调用时，必须指定事务应该如何传播。例如：方法可能继续在现有事务中运行，也可能开启一个新事务，并在自己的事务中运行。
+
+正确的事务传播行为可能的值如下:
+
+**1.`TransactionDefinition.PROPAGATION_REQUIRED`**
+
+使用的最多的一个事务传播行为，我们平时经常使用的`@Transactional`注解默认使用就是这个事务传播行为。如果当前存在事务，则加入该事务；如果当前没有事务，则创建一个新的事务。
+
+**`2.TransactionDefinition.PROPAGATION_REQUIRES_NEW`**
+
+创建一个新的事务，如果当前存在事务，则把当前事务挂起。也就是说不管外部方法是否开启事务，`Propagation.REQUIRES_NEW`修饰的内部方法会新开启自己的事务，且开启的事务相互独立，互不干扰。
+
+**3.`TransactionDefinition.PROPAGATION_NESTED`**
+
+如果当前存在事务，则创建一个事务作为当前事务的嵌套事务来运行；如果当前没有事务，则该取值等价于`TransactionDefinition.PROPAGATION_REQUIRED`。
+
+**4.`TransactionDefinition.PROPAGATION_MANDATORY`**
+
+如果当前存在事务，则加入该事务；如果当前没有事务，则抛出异常。（mandatory：强制性）
+
+
+
+除了以上4个事务隔离级别，以下 3 种事务传播行为，事务将不会发生回滚：
+
+- **`TransactionDefinition.PROPAGATION_SUPPORTS`**: 如果当前存在事务，则加入该事务；如果当前没有事务，则以非事务的方式继续运行。
+- **`TransactionDefinition.PROPAGATION_NOT_SUPPORTED`**: 以非事务方式运行，如果当前存在事务，则把当前事务挂起。
+- **`TransactionDefinition.PROPAGATION_NEVER`**: 以非事务方式运行，如果当前存在事务，则抛出异常。
+
+
+
+### Spring 事务中的隔离级别有哪几种?
+
+事物的隔离级别（isolation level）定义了一个事务可能受其他并发事务影响的程度。 在并发事务中，经常会引起以下问题：
+
+* **脏读（Dirty reads）**——脏读发生在一个事务读取了另一个事务改写但尚未提交的数据时。如果改写在稍后被回滚了，那么第一个事务获取的数据就是无效的。
+
+- **不可重复读（Nonrepeatable read）**——不可重复读发生在一个事务执行相同的查询两次或两次以上，但是每次都得到不同的数据时。这通常是因为另一个并发事务在两次查询期间进行了更新。
+- **幻读（Phantom read）**——幻读与不可重复读类似。它发生在一个事务（T1）读取了几行数据，接着另一个并发事务（T2）插入了一些数据时。在随后的查询中，第一个事务（T1）就会发现多了一些原本不存在的记录。
+
+​    所以为了解决这些问题，引入了数据库的事务隔离级别的概念。Spring定义的事务隔离级别和数据库中定义的事务隔离级别是对应的，具体如下：
+
+| 隔离级别                     | 含义                                                         |
+| ---------------------------- | ------------------------------------------------------------ |
+| `ISOLATION_DEFAULT`          | 使用后端数据库默认的隔离级别，MySQL 默认采用的 `REPEATABLE_READ` 隔离级别 Oracle 默认采用的 `READ_COMMITTED` 隔离级别. |
+| `ISOLATION_READ_UNCOMMITTED` | 最低的隔离级别，允许读取尚未提交的数据变更，可能会导致脏读、幻读或不可重复读 |
+| `ISOLATION_READ_COMMITTED`   | 允许读取并发事务已经提交的数据，可以阻止脏读，但是幻读或不可重复读仍有可能发生 |
+| `ISOLATION_REPEATABLE_READ`  | 对同一字段的多次读取结果都是一致的，除非数据是被本身事务自己所修改，可以阻止脏读和不可重复读，但幻读仍有可能发生 |
+| `ISOLATION_SERIALIZABLE`     | 最高的隔离级别，完全服从ACID的隔离级别，确保阻止脏读、不可重复读以及幻读，也是最慢的事务隔离级别，因为它通常是通过完全锁定事务相关的数据库表来实现的 |
+
+
+
+### Spring 事务常见问题
+
+#### （1）大事务导致事务超时
+
+上周有一个功能，包含FTP文件上传及数据库操作，不知道是不是网络的原因，FTP把文件传输到对方服务器的时间特别长，导致后续的写库操作无法执行。后面是通过将功能拆分，不在事务内部执行文件上传，移到外层就行。
+
+
+
+#### （2）事务失效
+
+##### （2.1）非public方法失效
+
+在源码内部对于非public方式执行返回null,不支持对非public的事务支持
+
+![img](https://segmentfault.com/img/bVcSxIO)
+
+##### （2.2）rollbackFor配置为默认值
+
+将rollbackFor配置为默认值后，抛出非检查性异常时，事务无法回滚
+
+##### （2.3）使用了不支持事务的引擎
+
+在MySQL中支持事务的引擎是`innodb`
