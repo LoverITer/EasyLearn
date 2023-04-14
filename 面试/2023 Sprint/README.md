@@ -4405,3 +4405,45 @@ public class GlobalExceptionHandler {
 ##### （2.3）使用了不支持事务的引擎
 
 在MySQL中支持事务的引擎是`innodb`
+
+
+
+# 七、Spring Boot
+
+### 什么是SpringBoot?
+
+Spring Boot 是 Spring 开源组织下的子项目，**是 Spring 组件一站式解决方案，主要是简化了使用 Spring 的难度，简省了繁重的配置，提供了各种启动器，开发者能快速上手**。
+
+* `独立运行`
+
+  Spring Boot 而且内嵌了各种 servlet 容器，Tomcat、Jetty 等，现在不再需要打成war 包部署到容器中，Spring Boot 只要打成一个可执行的 jar 包就能独立运行，所有的依赖包都在一个 jar 包内。
+
+* `简化配置`
+
+  spring-boot-starter-web 启动器自动依赖其他组件，简少了 maven 的配置。
+
+* `自动配置`
+
+  Spring Boot 能根据当前类路径下的类、jar 包来自动配置 bean，如添加一个 spring
+
+  boot-starter-web 启动器就能拥有 web 的功能，无需其他配置。
+
+* `无代码生成和XML配置`
+
+  Spring Boot 配置过程中无代码生成，也无需 XML 配置文件就能完成所有配置工作，这一切都是借助于条件注解完成的，这也是 Spring4.x 的核心功能之一。
+
+
+
+### SpringBoot核心注解有哪些？
+
+启动类上面的注解是`@SpringBootApplication`，他也是SpringBoot的核心注解，主要组合包含了以下3个注解：
+
+- `@SpringBootConfiguration`：组合了@Configuration注解，实现配置文件的功能；
+- `@EnableAutoConfiguration`：打开自动配置的功能，也可以关闭某个自动配置的选项，如关闭数据源自动配置的功能：
+- `@SpringBootApplication(exclude={DataSourceAutoConfiguration.class})`；
+- `@ComponentScan`：Spring组件扫描。
+
+
+
+### SpringBoot自动配置原理？
+
