@@ -1808,6 +1808,229 @@ JUC框架包主要包含5大部分：
 
 ## 3.4 J.U.C锁详解
 
+### 什么是AQS?
+
+`AQS（AbstractQueuedSynchronizer）`是 Java 并发包中一个提供原子性状态管理的基础工具类。AQS 可以用来构建同步器，例如 `ReentrantLock`、`Semaphore`、`CountDownLatch` 等。它是一个抽象类，使用了`模板方法`设计模式，允许子类通过继承和重写其内部方法来实现自定义的同步器。
+
+AQS 内部维护了一个等待队列和一个int类型的同步状态。等待队列用于存储等待获取同步状态的线程，并按照先进先出的顺序进行排队；同步状态则表示当前同步器的状态，可以被多个线程并发获取和释放。AQS 提供了 acquire() 和 release() 方法来获取和释放同步状态，通过实现这些方法可以定义不同的同步逻辑。
+
+AQS 内部使用了 CAS（Compare-And-Swap）操作来实现同步状态的原子性修改，同时也提供了一些支持扩展的方法，例如 tryAcquire()、tryRelease()、tryAcquireShared()、tryReleaseShared() 等，可以用于实现不同种类的同步器。AQS 的实现方式非常灵活，可以通过继承它来实现各种同步器，例如独占锁、共享锁等。
+
+
+
+### AQS的核心思想是什么? 它是怎么实现的? 底层数据结构等
+
+#### AQS数据结构
+
+![](http://image.easyblog.top/167992250739443fe0755-e3bb-4c4c-9b1a-f3730fbc1cfb.png)
+
+AQS（AbstractQueuedSynchronizer）的核心设计原理是基于一个**先进先出的等待队列**和一个**共享的状态变量**，通过线程的竞争和等待来实现对共享状态的管理和同步
+
+![img](https://p0.meituan.net/travelcube/7132e4cef44c26f62835b197b239147b18062.png)
+
+AQS 的等待队列是一个双向链表，用于存储等待获取同步状态的线程，并按照先进先出的顺序进行排队。队列中的每个节点包含了一个线程引用和一个等待状态（例如是否被阻塞、是否被中断等）。线程获取同步状态时，如果发现当前状态已经被其他线程占用，则该线程会被加入到等待队列中，并被阻塞。当状态被释放时，AQS 会从等待队列中唤醒下一个等待线程。
+
+每个Node节点中有以下几个重要的属性：
+
+![](http://image.easyblog.top/16799220634494109f2a8-bf7b-4b7e-95c2-6c83124e92e9.png)
+
+AQS中有两种锁模式：
+
+* SHARED： 表示线程以共享的模式等待锁
+* EXCLUSIVE：表示线程正在以独占的方式等待锁
+
+waitStatus有下面几个枚举值：
+
+* 0：当一个Node被初始化的时候的默认值
+* CANCELLED（1）：表示线程获取锁的请求已经取消了
+* CONDITION（-2）：表示节点在等待队列中，节点线程等待唤醒
+* PROPAGATE（-3）：当前线程处在SHARED情况下，该字段才会使用
+* SIGNAL（-1）：表示线程已经准备好了，就等资源释放了
+
+
+
+### AQS有哪些核心的方法?
+
+AQS提供了大量用于自定义同步器实现的Protected方法。自定义同步器实现的相关方法也只是为了通过修改State字段来实现多线程的独占模式或者共享模式。自定义同步器需要实现以下方法：
+
+![](http://image.easyblog.top/16800049061287c39c48c-a122-4958-8f9b-8c1dc12e642c.png)
+
+一般来说，自定义同步器要么是独占方式，要么是共享方式，它们也只需实现 `tryAcquire/tryRelease `或 `tryAcquireShared/tryReleaseShared` 中的一种即可。AQS也支持自定义同步器同时实现独占和共享两种方式，如ReentrantReadWriteLock。ReentrantLock是独占锁，所以实现了 `tryAcquire/tryRelease`。
+
+以非公平锁为例，这里主要阐述一下非公平锁与AQS之间方法的关联之处，具体每一处核心方法的作用会在文章后面详细进行阐述。
+
+![img](https://p1.meituan.net/travelcube/b8b53a70984668bc68653efe9531573e78636.png)
+
+为了帮助大家理解ReentrantLock和AQS之间方法的交互过程，以非公平锁为例，我们将加锁和解锁的交互流程单独拎出来强调一下，以便于对后续内容的理解。
+
+![img](https://p1.meituan.net/travelcube/7aadb272069d871bdee8bf3a218eed8136919.png)
+
+加锁：
+
+- 通过ReentrantLock的加锁方法Lock进行加锁操作。
+- 会调用到内部类Sync的Lock方法，由于Sync#lock是抽象方法，根据ReentrantLock初始化选择的公平锁和非公平锁，执行相关内部类的Lock方法，本质上都会执行AQS的Acquire方法。
+- AQS的Acquire方法会执行tryAcquire方法，但是由于tryAcquire需要自定义同步器实现，因此执行了ReentrantLock中的tryAcquire方法，由于ReentrantLock是通过公平锁和非公平锁内部类实现的tryAcquire方法，因此会根据锁类型不同，执行不同的tryAcquire。
+- tryAcquire是获取锁逻辑，获取失败后，会执行框架AQS的后续逻辑，跟ReentrantLock自定义同步器无关。
+
+解锁：
+
+- 通过ReentrantLock的解锁方法Unlock进行解锁。
+- Unlock会调用内部类Sync的Release方法，该方法继承于AQS。
+- Release中会调用tryRelease方法，tryRelease需要自定义同步器实现，tryRelease只在ReentrantLock中的Sync实现，因此可以看出，释放锁的过程，并不区分是否为公平锁。
+- 释放成功后，所有处理由AQS框架完成，与自定义同步器无关。
+
+### ReentrantLock 加锁和解锁原理？
+
+`ReentrantLock` 是AQS比较典型的应用，ReentrantLock有公平锁和非公平锁两种模式，底层机制都是类似的，这里以非公平锁为例进行分析加锁和解锁的原理，进而理解AQS的原理。
+
+#### 加锁
+
+##### lock
+
+ReentrantLock 中获取锁的方法是 `lock` 方法，方法调用了内部类`Sync`的`lock` 方法，`Sync` 类是`AQS`的子类同时是一个抽象类，在AQS中`Sync`有两种实现`FairSync` 和 `NonFairSync`，即 公平锁 和 非公平锁。这里我们看一下非公平锁的加锁实现。
+
+![](http://image.easyblog.top/16800104595274d0aaa87-f5ae-4b45-97c3-09cff7bc776f.png)
+
+* 首先，当前线程会尝试使用 CAS 的方式修改AQS中state的值从0修改为1，如果修改成功，设置当前线程为线程持有者
+* 如果修改state失败，则进入`acquire`方法
+
+
+
+##### acquire
+
+![](http://image.easyblog.top/16800110226652b659bf8-1854-4b96-8348-6648849da10b.png)
+
+AQS 在这里使用了模板方法设计模式，`tryAcquire`方法是需要子类来实现的方法，方法返回boolean值，返回true表示获取锁成功，此时AQS会讲当前线程设置为锁持有者并且设置为可以中断的，如果没有获取锁成功，则通过 `addWaiter` 和 `acquireQueued` 将当前线程添加到等待队列末尾。
+
+
+
+##### tryAcquire（nonfairTryAcquire）—获取锁
+
+`tryAcquire` 方法由 AQS 子类实现，这里就是 `NonfairSync`的 `tryAcquire` 实现，具体逻辑在 父类Sync的`nonfairTryAcquire`方法中做了实现
+
+![](http://image.easyblog.top/1680011405428e3ce9d9c-e707-4ccf-b771-73c6a7c6541e.png)
+
+方法中当前线程根据当前state值不同做出不同动作：
+
+* 当 **state=0**，再次尝试使用CAS的方式将state的值从0修改为1，如果设置成功就表示加锁成功，则将自己设置为锁持有者
+
+* 当 **state!=0**，这里 ReentrantLock 实现了重入锁的逻辑， 当当前线程判断锁持有者是自己则直接将state的值+1，表示锁的加锁次数
+
+* 最后，获取锁成功会返回true，否则返回false
+
+
+
+##### addWaiter—线程加入等待队列
+
+当执行`acquire(1)`时，会通过`tryAcquire(1)`获取锁。在这种情况下，如果获取锁失败，就会调用`addWaiter(Node.EXCLUSIVE)`以独占模式将当前线程加入到等待队列中去。
+
+![](http://image.easyblog.top/16800127570002dddfc52-4058-42ae-8470-b495decdb709.png)
+
+主要逻辑如下：
+
+* 首先通过当前的线程和锁模式新建一个等待队列节点。
+* 将变量pred指向等待队列尾指针tail
+* 如果pred指向尾不是Null，则将新创建的Node节点的prev指向pred，随后使用 CAS 的方式将等待队列的tail指针指向新加入的Node节点，设置成功将pred的next节点设置为新加入的Node节点
+* 如果Pred指针是Null（说明等待队列中没有元素），或者当前Pred指针和Tail指向的位置不同（说明被别的线程已经修改），就需要看一下`enq`的方法。
+
+
+
+##### enq—自旋加入等到队列
+
+![](http://image.easyblog.top/1680013504809ec585612-0ced-47ee-a812-c188118c71d8.png)
+
+方法是一个死循环，会不断重复做下面两件事：
+
+* 获取当前等待队列tail节点，如果tail节点是Null，表示等待队列还没有初始化，则需要进行初始化，此时会初始化等待队列的头和尾节点指向**同一个空节点**
+* 如果tail节点不是Null，表示当前等待队列是有初始化过的，则会不断重试将enq入参的node节点（当前线程包装的等待队列节点）设置为当前等待队列的尾节点，直到设置成功。
+
+
+
+##### acquireQueued—自旋获取锁
+
+经过 `addWaiter` 方法，未成功获取锁的线程已经被添加到等待队列尾部，下面就需要**让线程在等待队列中自旋不断地获取锁，直到获取成功或者不再需要获取（中断）**。
+
+![](http://image.easyblog.top/16800145946440797ca73-7cf3-426a-8411-1ccbb38bf7eb.png)
+
+方法主体是死循环，主要逻辑：
+
+* 获取当前节点的前驱节点
+  * **如果当前节点是头结点 并且 节点获取锁成功，则将head指针移动到当前节点，并将当前节点设置为虚节点**
+  * **如果当前节点是头结点 并且 节点获取锁未成功**，会判断当前节点是否需要阻塞：
+    * 如果当前节点需要阻塞，则调用 `LockSupport.part(this)`方法阻塞当前方法
+    * 如果当前节点不需要阻塞，则重新尝试调用 `tryAcquire`重新获取锁
+
+
+
+上述方法的流程图如下：
+
+
+
+![img](https://p0.meituan.net/travelcube/c124b76dcbefb9bdc778458064703d1135485.png)
+
+从上图可以看出**，跳出当前循环的条件是当“前置节点是头结点，且当前线程获取锁成功”**。但为了防止因死循环导致CPU资源被浪费，我们会判断前置节点的状态来决定是否要将当前线程挂起，具体挂起流程用流程图表示如下（`shouldParkAfterFailedAcquire`流程）：
+
+![img](https://p0.meituan.net/travelcube/9af16e2481ad85f38ca322a225ae737535740.png)
+
+
+
+#### 解锁
+
+前面我们已经剖析了加锁过程中的基本流程，接下来再对解锁的基本流程进行分析。由于ReentrantLock在解锁的时候，并不区分公平锁和非公平锁，所以我们直接看解锁的源码：
+
+##### unlock/release—释放锁
+
+`ReentrantLock` 锁的`unlock`方法直接调用 `Sync`类的`release`方法，所以直接看 `release`方法
+
+![](http://image.easyblog.top/168001708651070b47562-26f3-4f90-8d94-fdbed3eb2e36.png)
+
+* 自定义的tryRelease如果返回true，说明该锁没有被任何线程持有（锁被释放）
+* 如果锁被释放，判断当前头结点不为空并且头结点的waitStatus不是初始化节点情况，则调用 `unparkSuccessor`方法唤醒后继节点
+
+
+
+**这里的判断条件为什么是 `h != null && h.waitStatus != 0` ？**
+
+> 1. h == null Head还没初始化。初始情况下，head == null，第一个节点入队，Head会被初始化一个虚拟节点。所以说，这里如果还没来得及入队，就会出现head == null 的情况。
+> 2. h != null && waitStatus == 0 表明后继节点对应的线程仍在运行中，不需要唤醒。
+> 3. h != null && waitStatus < 0 表明后继节点可能被阻塞了，需要唤醒。
+
+
+
+##### tryRelease—释放锁
+
+在ReentrantLock里面的公平锁和非公平锁的父类Sync定义了可重入锁的释放锁机制 `tryRelease`。
+
+![](https://image.easyblog.top/%E6%88%AA%E5%B1%8F2023-03-29%20%E4%B8%8B%E5%8D%888.30.34.png)
+
+方法返回boolean值，表示当前线程是否释放锁成功，true 表示已释放，false表示没有释放，具体逻辑如下：
+
+* 获取当前锁state值，并将锁重入次数减一
+* 如果当前线程不是持有锁的线程，则报错
+* 如果当前线程是持有锁的线程，并且state值是0了，则将当前独占锁所有线程设置为null，并更新state
+
+
+
+##### unparkSuccessor—唤醒后继结点
+
+![](https://image.easyblog.top/%E6%88%AA%E5%B1%8F2023-03-29%20%E4%B8%8B%E5%8D%889.31.05.png)
+
+* 获取头结点`waitStatus`，如果头结点等待状态 `waitStatus < 0`  ，说明头结点 
+* 获取当前节点的下一个节点
+  * 如果当前节点的下个节点不为空，而且等待状态`waitStatus<=0`，就把当前节点的下一个节点唤醒
+  * 如果下个节点是null或者下个节点被cancelled，就找到队列最开始的非cancelled的节点
+    * 寻找的方式是从尾部开始往前遍历等待队列，直到找到队列第一个waitStatus<0的节点，
+    * 如果找到这样的节点，则将此节点唤醒
+
+
+
+**为什么要从后往前找第一个非Cancelled的节点呢？**
+
+> 这里可以回到 `addWaiter` AQS将线程加入等到队列的操作说起，**节点入队并不是原子操作**，也就是说，node.prev = pred; compareAndSetTail(pred, node) 这两个地方可以看作Tail入队的原子操作，但是此时pred.next = node;还没执行，如果这个时候执行了unparkSuccessor方法，就没办法从前往后找了，所以需要从后往前找。还有一点原因，在产生CANCELLED状态节点的时候，先断开的是Next指针，Prev指针并未断开，因此也是必须要从后往前遍历才能够遍历完全部的Node。
+>
+> 
+>
+> **综上所述，如果是从前往后找，由于极端情况下入队的非原子操作和CANCELLED节点产生过程中断开Next指针的操作，可能会导致无法遍历所有的节点**。
 
 
 
@@ -1815,35 +2038,2412 @@ JUC框架包主要包含5大部分：
 
 
 
+### ReentrantLock/Lock 锁 和 synchronized 锁的区别？
+
+* （1）**synchronized是Java的关键字是jvm层面上的互斥锁，ReentrantLock/Lock 通过类实现的一个互斥锁**
+* （2）**使用synchronized时，当线程执行完同步代码之后或者出现异常之后jvm会自动让线程释放锁；但是ReentrantLock/Lock 在使用的时候必须手动显示的在finally块中释放锁,如果没这样做，容易产生死锁**
+* （3）**ReentrantLock/Lock 可以让等待锁的线程响应中断，而synchronized却不行，使用synchronized时，等待的线程会一直等待下去，不能够响应中断；**
+* （4）**通过 ReentrantLock/Lock 可以知道有没有成功获取锁，而synchronized却无法办到**
+* （5）**ReentrantLock/Lock 可以提高多个线程进行读操作的效率。从性能上来说，如果竞争资源不激烈，两者的性能是差不多的，而当竞争资源非常激烈时（即有大量线程同时竞争），此时Lock的性能要远远优于synchronized**。
+
+
+
+### CountDownLatch原理简介？
+
+CountDownLatch是一个同步工具类，用来协调多个线程之间的同步。这个工具通常用来控制线程等待，它可以让某一个线程等待直到倒计时结束，再开始执行。
+
+**CountDownLatch 的两种应用场景**：
+
+1. 某一线程在开始运行前等待n个线程执行完毕。将 CountDownLatch 的计数器初始化为n ：`new CountDownLatch(n)`，每当一个任务线程执行完毕，就将计数器减1 `countdownlatch.countDown()`，当计数器的值变为0时，在 `CountDownLatch上 await()` 的线程就会被唤醒。一个典型应用场景就是启动一个服务时，主线程需要等待多个组件加载完毕，之后再继续执行。
+
+2. 实现多个线程开始执行任务的最大并行性。注意是并行性，不是并发，强调的是多个线程在某一时刻同时开始执行。类似于赛跑，将多个线程放到起点，等待发令枪响，然后同时开跑。做法是初始化一个共享的 `CountDownLatch` 对象，将其计数器初始化为 1 ：`new CountDownLatch(1)`，多个线程在开始执行任务前首先 `coundownlatch.await()`，当主线程调用 countDown() 时，计数器变为0，多个线程同时被唤醒。
+
+**CountDownLatch 的不足**
+
+CountDownLatch是一次性的，计数器的值只能在构造方法中初始化一次，之后没有任何机制再次对其设置值，当CountDownLatch使用完毕后，它不能再次被使用。
+
+
+
+### CycleBarrier原理简介？
+
+CyclicBarrier 和 CountDownLatch 非常类似，它也可以实现线程间的等待，但是它的功能比 CountDownLatch 更加复杂和强大。主要应用场景和 CountDownLatch 类似
+
+**CyclicBarrier 的应用场景**
+
+CyclicBarrier 可以用于多线程计算数据，最后合并计算结果的应用场景。比如我们用一个Excel保存了用户所有银行流水，每个Sheet保存一个帐户近一年的每笔银行流水，现在需要统计用户的日均银行流水，先用多线程处理每个sheet里的银行流水，都执行完之后，得到每个sheet的日均银行流水，最后，再用barrierAction用这些线程的计算结果，计算出整个Excel的日均银行流水。
 
 
 
 
 
+### Semaphore原理简介？
 
+Semaphore（信号量）， synchronized 和 ReentrantLock 都是一次只允许一个线程访问某个资源，**Semaphore(信号量)可以指定多个线程同时访问某个资源**。Semaphore 有两种模式，公平模式和非公平模式。
+
+- **公平模式：** 调用acquire的顺序就是获取许可证的顺序，遵循FIFO；
+- **非公平模式：** 抢占式的。
 
 
 
 ## 3.5 J.U.C线程池详解
 
+### 为什么要有线程池?
+
+线程池能够对线程进行统一分配，调优和监控:
+
+- **降低资源消耗**。通过重复利用已创建的线程降低线程创建和销毁造成的消耗 
+- **提高响应速度**。当任务到达时，任务可以不需要等到线程创建就能立即执行。 
+- **提高线程的可管理性**。线程是稀缺资源，如果无限制的创建，不仅会消耗系统资源，还会降低系统的稳定性，使用线程池可以进行统一的分配，调优和监控。
+
+
+
+### Java实现和管理线程池有哪些方式? 
+
+1. 使用`java.util.concurrent.Executors`工厂类创建线程池。这个工厂类提供了几种预定义的线程池实现，如`newFixedThreadPool`，`newCachedThreadPool`和`newSingleThreadExecutor`等，可以根据应用场景选择不同的线程池。
+2. 自定义ThreadPoolExecutor线程池，这是一种比较灵活的方式，可以通过`ThreadPoolExecutor`的构造函数来指定线程池的核心线程数、最大线程数、队列容量等参数。
+3. 可以使用`ScheduledThreadPoolExecutor`来实现定时任务调度。ScheduledThreadPoolExecutor是ThreadPoolExecutor的一个子类，可以用来定时执行任务或周期性地执行任务。
+4. Java 8引入了`CompletableFuture`类，可以使用它的异步特性来实现线程池的管理。
+5. Java 9引入了新的工厂类，如Flow类和SubmissionPublisher类，可以实现异步任务的处理和结果处理。
+
+
+
+### ThreadPoolExecutor有哪些核心的配置参数? 请简要说明
+
+**线程池的构造方法**
+
+```java
+public ThreadPoolExecutor(int corePoolSize,
+                          int maximumPoolSize,
+                          long keepAliveTime,
+                          TimeUnit unit,
+                          BlockingQueue<Runnable> workQueue,
+                          ThreadFactory threadFactory,
+                          RejectedExecutionHandler handler) {
+    //省略.....
+}
+```
+
+- 1、**corePoolSize**：线程池中核心线程个数
+
+- 2、**maximunPoolSize**：线程池最大允许的线程个数（这里有一个救急线程的概念，就是非核心线程，它的数量是maximunPoolSize-corePoolSize）
+
+- 3、**keepAliveTime**：这个参数是给非核心线程设定的，他表示非核心线程可以空闲时间，超过这个时间就会被回收
+
+- 4、**unit**：空闲时间的单位
+
+- 5、**workQueue**：任务队列，它是一个阻塞队列，用于存放等待执行的任务。
+
+- 6、**threadFactory**：线程工厂，用于创建线程以及可以给线程起一个有意义的名字
+
+- 7、**RejectedExecutionHandler**：当任务队列和线程池都处于满负荷运行时，新提交的任务应该如何处理的策略，称为**饱和策略**。Java中提供的策略有以下4种：
+
+  > （1）ThreadPoolExecutor.AbortPolicy：直接抛出异常，这是默认的策略
+  >
+  > （2）ThreadPoolExecutor.CallerRunsPolicy：让调用者来执行该任务
+  >
+  > （3）ThreadPoolExecutor.DisCardPolicy：不做任何处理，直接把任务丢掉，也不抛出任何异常
+  >
+  > （4）ThreadPoolExecutor.DisCardOldestPolicy：丢弃任务队列头部的任务，然后尝试执行当前任务
+
+  当然，我们也可以根据我们的业务场景通过实现`RejectExeptionPolicy`接口实现自定义策略。
+
+
+
+### ThreadPoolExecutor线程池任务提交的流程
+
+![img](http://image.easyblog.top/158636140301387db9ed6-7a20-42db-94d6-5377024a8cc7.jpg)
+
+* （1）首先会判断运行中的线程数是否小于corePoolSize，如果小于，则直接创建新的线程执行任务。
+* （2）如果运行中的线程大于corePoolSize，判断workQueue任务队列是否已经满了，如果还没有满，则将任务放到任务队列中排队等待被处理；
+* （3）如果workQueue任务队列满了，则判断当前线程数是否大于线程池的最大线程数，如果没有大于最大线程数则创建新的线程处理任务；
+* （4）如果运行中的线程数大于最大线程数，则通过拒绝策略处理新提交的任务。在ThreadPoolExecutor中提供了4种拒绝策略：AbortPolicy：直接抛出异常，这是默认的策略；CallerRunsPolicy：让调用者来执行该任务；DisCardPolicy：不做任何处理，直接把任务丢掉，也不抛出任何异常；DisCardOldestPolicy：丢弃任务队列头部的任务，然后尝试执行当前任务
+
+
+
+### 线程池中任务是如何关闭的?
+
+关闭线程池可以使用线程池的`shutdown` 或 `shutdownNow`方法
+
+- shutdown
+
+将线程池里的线程状态设置成SHUTDOWN状态, 然后中断所有没有正在执行任务的线程.
+
+- shutdownNow
+
+将线程池里的线程状态设置成STOP状态, 然后停止所有正在执行或暂停任务的线程. 只要调用这两个关闭方法中的任意一个, isShutDown() 返回true. 当所有任务都成功关闭了, isTerminated()返回true.
+
+
+
+### 如何合理配置线程池参数？
+
+要想合理的配置线程池，就必须首先分析任务特性，可以从以下几个角度来进行分析：
+
+1. 任务的性质：CPU密集型任务，IO密集型任务和混合型任务。
+2. 任务的优先级：高，中和低。
+3. 任务的执行时间：长，中和短。
+4. 任务的依赖性：是否依赖其他系统资源，如数据库连接。
+
+任务性质不同的任务可以用不同规模的线程池分开处理。CPU密集型任务配置尽可能少的线程数量，如配置**Ncpu+1**个线程的线程池。IO密集型任务则由于需要等待IO操作，线程并不是一直在执行任务，则配置尽可能多的线程，如**2xNcpu**。混合型的任务，如果可以拆分，则将其拆分成一个CPU密集型任务和一个IO密集型任务，只要这两个任务执行的时间相差不是太大，那么分解后执行的吞吐率要高于串行执行的吞吐率，如果这两个任务执行时间相差太大，则没必要进行分解。我们可以通过`Runtime.getRuntime().availableProcessors()`方法获得当前设备的CPU个数。
+
+优先级不同的任务可以使用优先级队列PriorityBlockingQueue来处理。它可以让优先级高的任务先得到执行，需要注意的是如果一直有优先级高的任务提交到队列里，那么优先级低的任务可能永远不能执行。
+
+执行时间不同的任务可以交给不同规模的线程池来处理，或者也可以使用优先级队列，让执行时间短的任务先执行。
+
+依赖数据库连接池的任务，因为线程提交SQL后需要等待数据库返回结果，如果等待的时间越长CPU空闲时间就越长，那么线程数应该设置越大，这样才能更好的利用CPU。
+
+并且，阻塞队列**最好是使用有界队列**，如果采用无界队列的话，一旦任务积压在阻塞队列中的话就会占用过多的内存资源，甚至会使得系统崩溃。
+
+
+
+### ScheduledThreadPoolExecutor有什么样的数据结构，核心内部类和抽象类?
+
+![img](https://pdai.tech/images/thread/java-thread-x-stpe-1.png)
+
+ScheduledThreadPoolExecutor继承自 `ThreadPoolExecutor`。ScheduledThreadPoolExecutor 内部构造了两个内部类 `ScheduledFutureTask` 和 `DelayedWorkQueue`:
+
+- `ScheduledFutureTask`: 继承了FutureTask，是一个异步运算任务；最上层分别实现了Runnable、Future、Delayed接口，说明它是一个可以延迟执行的异步运算任务。
+- `DelayedWorkQueue`: 这是 ScheduledThreadPoolExecutor 为存储周期或延迟任务专门定义的一个延迟队列，继承了 AbstractQueue，为了契合 ThreadPoolExecutor 也实现了 BlockingQueue 接口。它内部只允许存储 RunnableScheduledFuture 类型的任务。与 DelayQueue 的不同之处就是它只允许存放 RunnableScheduledFuture 对象，并且自己实现了二叉堆(DelayQueue 是利用了 PriorityQueue 的二叉堆结构)。
 
 
 
 
 
+### ScheduledThreadPoolExecutor相比ThreadPoolExecutor有哪些特性?
+
+ScheduledThreadPoolExecutor继承自 ThreadPoolExecutor，为任务提供延迟或周期执行，属于线程池的一种。和 ThreadPoolExecutor 相比，它还具有以下几种特性:
+
+- 使用专门的任务类型—ScheduledFutureTask 来执行周期任务，也可以接收不需要时间调度的任务(这些任务通过 ExecutorService 来执行)。
+- 使用专门的存储队列—DelayedWorkQueue 来存储任务，DelayedWorkQueue 是无界延迟队列DelayQueue 的一种。相比ThreadPoolExecutor也简化了执行机制(delayedExecute方法，后面单独分析)。
+- 支持可选的run-after-shutdown参数，在池被关闭(shutdown)之后支持可选的逻辑来决定是否继续运行周期或延迟任务。并且当任务(重新)提交操作与 shutdown 操作重叠时，复查逻辑也不相同。
 
 
 
 
+
+### Fork/Join主要用来解决什么样的问题?
+
+Fork/Join是一种**并行编程模型**，它主要**用于解决计算密集型问题**，即需要进行大量计算的任务。
+
+该模型基于“分而治之”的策略，通过将一个大任务划分为许多小任务，然后并行地执行这些小任务，最终将它们的结果合并成一个最终结果。这个过程通常被称为“fork-join”。
+
+这种并行计算模型非常适合于多核处理器或分布式系统中的并行计算。一些典型的应用包括图像处理、数据分析、并行搜索和排序算法等。
+
+
+
+### Fork/Join框架主要包含哪三个模块? 模块之间的关系是怎么样的?
+
+Fork/Join框架主要包含三个模块:
+
+- `ForkJoinTask`：我们要使用ForkJoin框架，必须首先创建一个ForkJoin任务。它提供在任务中执行fork()和join()操作的机制，通常情况下我们不需要直接继承ForkJoinTask类，而只需要继承它的子类，Fork/Join框架提供了以下两个子类：
+  - `RecursiveAction`：是一种ForkJoinTask的子类，用于表示不需要返回结果的任务，即只需要执行一些操作，而不需要返回结果。
+  - `RecursiveTask`：是一种ForkJoinTask的子类，用于表示需要返回结果的任务，即需要执行一些操作，并返回一个结果。
+- `ForkJoinPool`：是Fork/Join框架的核心，它管理着一组线程池，并提供了线程池的创建、启动、关闭和维护等操作。ForkJoinTask需要通过ForkJoinPool来执行，任务分割出的子任务会添加到当前工作线程所维护的双端队列中，进入队列的头部。当一个工作线程的队列里暂时没有任务时，它会随机从其他工作线程的队列的尾部获取一个任务。
+- `ForkJoinWorkerThread`：是Fork/Join框架中的工作线程，它负责执行具体的任务，并将结果返回给主线程。
+
+这三者的关系是: ForkJoinPool可以通过池中的ForkJoinWorkerThread来处理ForkJoinTask任务。
+
+
+
+### ForkJoinPool类继承关系?
+
+![img](https://pdai.tech/images/thread/java-thread-x-forkjoin-1.png)
+
+内部类介绍:
+
+- `ForkJoinWorkerThreadFactory`: 内部线程工厂接口，用于创建工作线程ForkJoinWorkerThread
+- `DefaultForkJoinWorkerThreadFactory`: ForkJoinWorkerThreadFactory 的默认实现类
+- `InnocuousForkJoinWorkerThreadFactory`: 实现了 ForkJoinWorkerThreadFactory，无许可线程工厂，当系统变量中有系统安全管理相关属性时，默认使用这个工厂创建工作线程。
+- `EmptyTask`: 内部占位类，用于替换队列中 join 的任务。
+- `ManagedBlocker`: 为 ForkJoinPool 中的任务提供扩展管理并行数的接口，一般用在可能会阻塞的任务(如在 Phaser 中用于等待 phase 到下一个generation)。
+- `WorkQueue`: ForkJoinPool 的核心数据结构，本质上是work-stealing 模式的双端任务队列，内部存放 ForkJoinTask 对象任务，使用 @Contented 注解修饰防止伪共享。
+  - 工作线程在运行中产生新的任务(通常是因为调用了 fork())时，此时可以把 WorkQueue 的数据结构视为一个栈，新的任务会放入栈顶(top 位)；工作线程在处理自己工作队列的任务时，按照 LIFO 的顺序。
+  - 工作线程在处理自己的工作队列同时，会尝试窃取一个任务(可能是来自于刚刚提交到 pool 的任务，或是来自于其他工作线程的队列任务)，此时可以把 WorkQueue 的数据结构视为一个 FIFO 的队列，窃取的任务位于其他线程的工作队列的队首(base位)。
+- 伪共享状态: 缓存系统中是以缓存行(cache line)为单位存储的。缓存行是2的整数幂个连续字节，一般为32-256个字节。最常见的缓存行大小是64个字节。当多线程修改互相独立的变量时，如果这些变量共享同一个缓存行，就会无意中影响彼此的性能，这就是伪共享。
+
+
+
+### ForkJoinTask抽象类继承关系?
+
+![img](https://pdai.tech/images/thread/java-thread-x-forkjoin-4.png)
+
+ForkJoinTask 实现了 Future 接口，它也是一个可取消的异步运算任务，实际上ForkJoinTask 是 Future 的轻量级实现，主要用在纯粹是计算的函数式任务或者操作完全独立的对象计算任务。fork 是主运行方法，用于异步执行；而 join 方法在任务结果计算完毕之后才会运行，用来合并或返回计算结果。 其内部类都比较简单，ExceptionNode 是用于存储任务执行期间的异常信息的单向链表；其余四个类是为 Runnable/Callable 任务提供的适配器类，用于把 Runnable/Callable 转化为 ForkJoinTask 类型的任务(因为 ForkJoinPool 只可以运行 ForkJoinTask 类型的任务)。
+
+
+
+### Fork/Join 框架的执行流程/运行机制是怎么样的?
+
+![img](https://pdai.tech/images/thread/java-thread-x-forkjoin-5.png)
+
+
+
+### Fork/Join的分治思想和work-stealing 实现方式?
+
+#### 分治算法(Divide-and-Conquer)
+
+分治算法(Divide-and-Conquer)把任务递归的拆分为各个子任务，这样可以更好的利用系统资源，尽可能的使用所有可用的计算能力来提升应用性能。首先看一下 Fork/Join 框架的任务运行机制:
+
+![img](https://pdai.tech/images/thread/java-thread-x-forkjoin-2.png)
+
+#### work-stealing(工作窃取)算法
+
+工作窃取算法（work-stealing）是一种多线程任务调度算法，在工作窃取算法中，每个线程都维护一个任务队列（也称为工作队列），线程会从自己的任务队列中取出任务执行。当一个线程执行完自己的任务队列中的所有任务时，它会从其他线程的任务队列中“窃取”一些任务来执行，以保证所有线程的任务负载均衡。
+
+工作窃取算法的主要思想是：当一个线程的任务执行完毕时，它会从其他线程的任务队列中随机选择一个任务“窃取”，并将这个任务添加到自己的任务队列中。这样可以避免某个线程的任务队列中出现过多的任务，而其他线程的任务队列却很空闲的情况。
+
+工作窃取算法的优点在于：
+
+1. 它可以充分利用多核处理器的计算资源，提高程序的并发性能。
+2. 它可以避免线程之间的竞争，提高线程的执行效率。
+3. 它可以动态地调整任务的分配策略，从而避免任务的负载不平衡。
+
+
+
+**Tips：**
+
+> 在 ForkJoinPool 中，线程池中每个工作线程(ForkJoinWorkerThread)都对应一个任务队列(WorkQueue)，工作线程优先处理来自自身队列的任务(LIFO或FIFO顺序，参数 mode 决定)，然后以FIFO的顺序随机窃取其他队列中的任务。
+>
+> 具体思路如下:
+>
+> * 每个线程都有自己的一个WorkQueue，该工作队列是一个双端队列。
+> * 队列支持三个功能push、pop、poll
+> * push/pop只能被队列的所有者线程调用，而poll可以被其他线程调用。
+> * 划分的子任务调用fork时，都会被push到自己的队列中。
+> * 默认情况下，工作线程从自己的双端队列获出任务并执行。
+> * 当自己的队列为空时，线程随机从另一个线程的队列末尾调用poll方法窃取任务。
 
 ## 3.6 J.U.C并发集合详解
 
+### ConcurrentHashMap在JDK1.7和JDK1.8中实现有什么差别? 
+
+- `HashTable` : 使用了synchronized关键字对put等操作进行加锁;
+- `ConcurrentHashMap JDK1.7`: 使用分段锁机制实现;
+- `ConcurrentHashMap JDK1.8`: 则使用数组+链表+红黑树数据结构和CAS原子操作实现;
+
+
+
+### ConcurrentHashMap JDK1.7实现的原理是什么?
+
+在JDK1.5~1.7版本，Java使用了分段锁机制实现ConcurrentHashMap.
+
+简而言之，ConcurrentHashMap在对象中保存了一个Segment数组，即将整个Hash表划分为多个分段；而每个Segment元素，它通过继承 ReentrantLock 来进行加锁，所以每次需要加锁的操作锁住的是一个 segment，这样只要保证每个 Segment 是线程安全的，也就实现了全局的线程安全；这样，在执行put操作时首先根据hash算法定位到元素属于哪个Segment，然后对该Segment加锁即可。因此，ConcurrentHashMap在多线程并发编程中可是实现多线程put操作。
+
+
+
+#### 数据结构
+
+jdk1.7 的ConcurrentHashMap的底层数据结构是**数组+链表**，ConcurrentHashMap是主要由**Segment**数组结构和 **HashEntry**数组结构组成。如下图所示。
+
+![img](https://pdai.tech/images/thread/java-thread-x-concurrent-hashmap-1.png)
+
+整个ConcurrentHashMap 由一个个 **Segment** 组成，Segment 代表“部分” 或 “一段”的意思，所以很多地方都会将其描述为分段锁。
+
+简单的理解，ConcurrentHashMap 是一个 Segment数组，Segment 通过继承 ReentrantLock来进行加锁，所以每次需要加锁的操作锁住的是一个 Segment，这样只要保证每个 Segment是线程安全的，也就实现了全局的线程安全性。每个Segment中维护了一个HashEntry数组，它用于存储键值对。
+
+- **Segment继承了ReentrantLock，是一个可重入的锁，它在ConcurretnHashMap中扮演锁的角色**；
+- **HashEntry则用于存储键值对**。它们之间的关系是：一个ConcurrentHashMap包含了一个Segment数组，一个Segment里维护了一个HashEntry数组，HashEntry数组和HashMap结构类似，是一种**数组+链表**的结构，当一个线程需要对HashEntry中的元素修改的时候，必须先获得Segment锁。
+
+
+
+#### **Segment内部类**
+
+首先先来熟悉一下Segment，Segment是ConcurrentHashMap的内部类，它在ConcurrentHashMap就是扮演锁的角色，主要组成如下：
+
+<img src="http://image.easyblog.top/1596449481856c291c686-a3ec-4bf4-bb47-464da2d52590.png" alt="img" style="zoom:67%;" />
+
+重要的即使那个HashEntry，HashEntry是一个和HashMap类似的数据结构，这里值的注意的是他被volatile修饰了。这里复习一下volatile的特性：
+
+（1）可以保证共享变量在多线程之间的内存可见性，即一个线程修改了共享变量的值对于其他线程是这个修改后的是可见的；
+
+（2）可以禁止指令重排序；
+
+（3）volatile可以保证对单次读写操作的原子性；
+
+这里使用volatile修饰HashEntry数组的目的当然是为了保证内存的可见性问题。为什么需要保证HashEntry数组的内存可见性呢？
+
+在往下看源码就会发现，jdk1.7以前的CHM的get操作是不需要加锁的，即**可以并发的读**，只有在写数据的时候才需要加锁，因此为了保证不同线程之前对于一个共享变量的数据一致，使用volatile再好不过。
+
+
+
+#### ConcurrentHashMap 初始化
+
+* `initialCapacity`：初始容量，这个值指的是整个 ConcurrentHashMap的初始容量，实际操作的时候需要平均分给每个 Segment。
+
+* `loadFactor`：负载因子，之前我们说了，Segment 数组不可以扩容，所以这个负载因子是给每个 Segment 内部使用的。
+
+* `concurrencyLevel`：并行级别、并发数、Segment 数。默认是16，也就是说 ConcurrentHashMap 默认有16个 Segment，所以理论上，最多同时支持16个线程并发写。这个值可以在初始化的时候设置为其他值，但是一旦初始化以后，它就不可以扩容了。最大值受MAX_SEGMENTS控制，为65535个。
+
+`new ConcurrentHashMap()` 无参进行初始化以后：
+
+（1）Segment数组的长度是16，并且segments[0]初始化了，其他segments[i]还是null，在使用之前需要调用ensureSegment()方法执行初始化
+
+（2）segments[i]的默认大小是2，也即HashEntry的默认大小是2，负载因子为0.75，得出初始阈值为1.5，也就插入第一个元素不会触发扩容，插入第二个进行一次扩容。
+
+**定位Segment**
+
+ConcurrentHashMap使用了分段锁Segment来维护不同段的数据，那么在插入和获取元素的时候，必须先通过算法首先定位到Segment上之后才可以在具体的HashEntry用类似HashMap找元素的方法来定位一个元素。
+
+
+
+#### put()—添加元素操作
+
+<img src="http://image.easyblog.top/1596464636809e8a0c99a-19f7-4b02-a40e-df25afb7672f.png" alt="img" style="zoom:67%;" />
+
+**put流程梳理：** 
+
+（1）首先检查value，如果value==null，抛出NPE；
+
+（2）根据hash值定位到Segment，定位segments[j]的算法是：**j=(hash>>>sgmentShift)&sgmentMask**，其实j就是hash值的低4位
+
+（3）获得到Segment后判断是否为null,如果是null，表示还没有初始化，那先调用ensureSegment()方法初始化Segment
+
+（4）最后，调用Segment对象的put方法存入键值对。
+
+* 4.1、首先通过父类ReentrantLock的tryLock()方法对每个Segment加锁，上锁成功之后继续执行，否则调用scanAndLockForPut()方法不断的调用tryLock()尝试获取锁，尝试的次数和CPU核数有关，单核CPU值尝试1次，多核CPU最多重试64次，如果重试结束还没有获取锁，那就阻塞等待锁； 
+* 4.2、确定HashEntry[i]的下标。`index = (tab.length - 1) & hash`; 
+* 4.3、如果当前HashEntry没有初始化，先初始化，并将键值对插入；
+* 4.4、已经初始化，遍历HashEntry链，有重复的，新值覆盖旧值，否则，插入； 
+* 4.5、**插入之后，判断是否需要扩容**，扩容：Segment[]是不能扩容的，只能扩容一个个Segment中的HashEntry[]的大小为原来的两倍
+
+
+
+#### get()—获取元素操作
+
+<img src="http://image.easyblog.top/15965148764775c348927-bf62-4713-8a0f-d8685f5d8f24.png" alt="img" style="zoom:50%;" />
+
+**get操作流程**： 
+
+（1）计算 hash值，
+
+（2）通过hash值找到 Segment数组中的下标。
+
+（3）再次根据 hash 找到每Segment内部的 HashEntry[]数组的下标。
+
+（4）遍历该数组位置处的链表，直到找到相等（内存地址相同或两个元素的hash值相同并且equals方法返回true）的 key。
+
+get 是不需要加锁的：原因是get方法是将共享变量（table）定义为volatile，让被修饰的变量对多个线程可见(即其中一个线程对变量进行了修改，会同步到主内存，其他线程也能获取到最新值)，允许一写多读的作。
+
+Segment的get操作实现非常简单和高效。**先经过一次hash()，然后使用散列值运算定位到Segment，在定位到聚义的元素的过程。**
+
+get操作的高效是因为整个get操作不需要加锁，为什么他不需要加锁呢？是**因为get方法中使用的共享变量都被定义成了volatile类型**，比如：统计当前Segment大小的count，和用于存储key-value的HashEntry。定义成volatile的变量能够在多个线程之间保证内存可见性，如果与多个线程读，它读取到的值一定是当前这个变量的最新值。
+
+
+
+#### size()—获取元素个数
+
+size()方法就是求当前ConcurrentHashMap中元素实际个数的方法，它是**弱一致性的**。方法的逻辑大致是：**首先他会使用不加锁的模式去尝试计算 ConcurrentHashMap 的 size，比较前后两次计算的结果，结果一致就认为当前没有元素加入或删除，计算的结果是准确的，然后返回此结果；如果尝试了三次之后结果还是不一致，它就会给每个 Segment 加上锁，然后计算 ConcurrentHashMap 的 size 返回。**
+
+<img src="https://image.easyblog.top/QQ%E6%88%AA%E5%9B%BE20210121205801.png" style="zoom:80%;" />
 
 
 
 
 
+### ConcurrentHashMap JDK1.8实现的原理是什么?
+
+JDK1.8的实现已经摒弃了Segment的概念，而是直接使用 **数组+链表+红黑树** 的数据结构来实现的，**并发控制使用的是CAS+synchronized**，jdk1.8版本的ConcurrentHashMap看起来就像是优化过之后线程安全的HashMap,虽然在JDK1.8中还能看到Segment的身影，但是已经简化了属性，只是为了兼容旧版本。下图是jdk1.8中ConcurrentHashMap的结构示意图：
+
+<img src="http://image.easyblog.top/15964512103041ffc1840-4e2e-49d0-b0f8-2d94c2726d63.jpg" alt="img"/>
+
+#### put()—添加元素操作
+
+**put()方法流程梳理：**
+
+（1）首先我们通过源码看到，jdk1.8中ConcurrentHashMap不允许key或value为null，如果你违反了就会报NPE。
+
+（2）之后获取到hash值，在之后会首先判断当前hash表是否被初始化了，因为jdk1.8中ConcurrentHashMap是懒惰初始化的，只有第一次put的时候才会初始化。初始化会调用initTable方法，该方法中使用CAS设置seizeCtl的值来保证线程安全。
+
+（3）如果哈希表已经初始化了，然后计算key的哈希桶的位置，如果在这个位置还是null，那就直接使用CAS设置新节点到桶的这个位置即可；定位桶的算法还是**i=(tab.length-1)&hash**
+
+（4）如果检查发现当前槽位的**头结点的hash值==-1**（标记为是ForwardingNode结点了），表示当前hash表正在扩容中，此时其他线程过去帮忙扩容;
+
+（5）如果当前hash表存在、(n-1)&hash 位子有元素了并且没有在扩容，那就是发生了哈希冲突，解决冲突之前首先对链表的头结点/红黑树的root结点上锁
+
+- 5.1、如果key的桶的位置还是链表，那就在链表的**尾部插入新的元素**，再次过程中还会统计链表的结点个数，存储在bitCount中，用于在插入之后判断是否需要扩容以及检查是否相同key的结点存在，如果存在那就执行值替换逻辑；
+- 5.2、如果key的桶的位置已经是红黑树了，那就把新的元素插入红黑树中
+
+（6）插入完毕之后会判断binCount的值是否已经大于等于树化阈值（TREEIFY_THRESHOLD=8）了，如果是，那就把链表转换为红黑树，不过最后转不转得成还要看哈希表的容量是不是大于MIN_TREEIFY_CAPACITY（64），如果没有达到只会扩容
+
+
+
+#### initTable()—初始化哈希表
+
+在put过程中如果是第一次put，此时hash表还没有初始化，因此需要首先初始化哈希表。初始化哈希表会调用initTable()方法，这个方法会使用CAS加锁，然后实例化一个hash表
+
+![](http://image.easyblog.top/168025111787210ca06a8-bf1e-4e9b-b2a5-90fd37970e04.png)
+
+
+
+#### get()—获取元素操作
+
+get()方法没有加锁，即可以并发的读，敢这么做重要是因为Node数组被volatile被修饰了，volatile保证了共享变量在多线程下的内存可见性，即其他线程只要一修改Node数组中的数据，get操作的线程马上就可以知道修改的数据。
+
+<img src="http://image.easyblog.top/15965397939966be09e6d-d8da-495f-b0ea-bc64c50fc780.png" alt="img" />
+
+get()方法逻辑梳理：
+
+（1）计算出key的hash值；
+
+（2）根据 hash 值找到哈希槽的位置：**(n - 1) & hash**
+
+（3）根据该位置处头节点的性质进行查找：
+
+* 1）如果该位置为 null，那么直接返回 null 就可以了
+* 2）如果该位置处的节点刚好就是我们需要的，返回该节点的值即可
+* 3）如果该位置节点的 hash 值小于 0，说明正在扩容，或者是红黑树，后面调用 find 接口，程序会根据上下文执行具体的方法。
+* 4）如果以上 3 条都不满足，那就是链表，进行遍历比对即可
+
+
+
+#### size()—获取元素的个数
+
+<img src="https://image.easyblog.top/QQ%E6%88%AA%E5%9B%BE20210121203722.png"/>
+
+ 
+
+#### transfer()—扩容操作
+
+扩容的逻辑比较复杂，这里不再贴出源码了，我们来捋一下关键流程就好了：
+
+- 首先扩容会传进来两个参数：旧哈希表和新哈希表（`Node<K,V>[] tab, Node<K,V>[] nextTab`），在第一个线程调用这个方法的时候新哈希表nextTab=null
+- **当线程判断nextTab=null之后，会new一个是旧hash表2倍大小的新哈希表**（`Node<K,V>[] nt = (Node<K,V>[])new Node<?,?>[n << 1];`）
+- **创建新哈希表完成之后就是元素结点的搬迁工作了**。这个过程中值的注意的是，**当一个线程把旧哈希表上桶中的元素搬迁到新的哈希表上之后或者这个桶中没有元素，它用一个ForwardingNode类型的结点挂在这个桶下，以此告诉其他线程这个桶位置已经被处理了，这样可以避免其他线程get或put时出现错误**
+- **还需要注意的是，在移动桶中元素的过程中，还是需要对链表和红黑树分别处理**，前者的判断依据是头结点的hash值大于等于0，后者的判断依据是头结点的hash值小于0并且头结点是TreeBin类的实例。
+
+
+
+### CopyOnWriteArrayList的实现原理?
+
+`CopyOnWriteArrayList` 是 Java 并发包中的一个线程安全的 List 实现，它的特点是写操作是通过复制一份新的数组来实现的，因此可以保证写操作的线程安全性，而读操作则可以并发执行。
+
+具体实现原理如下：
+
+1. 内部使用一个 `volatile` 修饰的数组来存储元素。在初始化时，`CopyOnWriteArrayList` 会创建一个空数组作为初始数组。当添加元素时，会将新元素添加到数组的末尾。
+2. 在进行写操作时，`CopyOnWriteArrayList` 首先会获取一个 `ReentrantLock` 锁，确保同一时刻只有一个线程进行写操作。
+3. 接着，会创建一个新的数组，并将原数组的元素复制到新数组中。因为新数组与原数组是不同的对象，所以写操作不会影响原数组。
+4. 写操作完成之后，`CopyOnWriteArrayList `会将新数组替换掉旧数组。由于 `volatile` 关键字的作用，所有线程都能立即看到数组的变化。
+5. 在进行读操作时，`CopyOnWriteArrayList` 直接读取当前数组的元素。因为当前数组不会发生变化，所以读操作是线程安全的。由于读操作与写操作是分离的，所以 `CopyOnWriteArrayList `可以支持高并发的读操作。
+
+总之，`CopyOnWriteArrayList` 是一种适用于读多写少的场景的线程安全 List 实现，通过写时复制的方式保证写操作的线程安全性，同时支持高并发的读操作。
+
+
+
+### CopyOnWriteArrayList有何缺陷，说说其应用场景?
+
+CopyOnWriteArrayList 有几个缺点：
+
+- 由于写操作的时候，需要拷贝数组，会消耗内存，如果原数组的内容比较多的情况下，可能导致young gc或者full gc
+- 不能用于实时读的场景，像拷贝数组、新增元素都需要时间，所以调用一个set操作后，读取到数据可能还是旧的,虽然CopyOnWriteArrayList 能做到最终一致性,但是还是没法满足实时性要求；
+
+
+
+### 阻塞队列有几种，分别都有哪些特性？
+
+阻塞队列（BlockingQueue）是一个支持两个附加操作的队列。这两个附加的操作是：在队列为空时，获取元素的线程会等待队列变为非空。当队列满时，存储元素的线程会等待队列可用。阻塞队列常用于生产者和消费者的场景，生产者是往队列里添加元素的线程，消费者是从队列里拿元素的线程。阻塞队列就是生产者存放元素的容器，而消费者也只从容器里拿元素。
+
+<img src="http://image.easyblog.top/1587444510867628c9aac-b66a-488b-8165-365de883ebf5.jpg" alt="img" style="zoom:30%;" />
+
+#### (1)、ArrayListBlockingQueue
+
+ArrayListBlockingQueue是一个用数组实现的有界阻塞队列，此队列按照先进先出（FIFO）的原则对元素进行排序。支持公平锁和非公平锁（默认情况下是非公平锁）。
+
+```java
+public ArrayBlockingQueue(int capacity) {
+    //默认使用的是非公平锁
+    this(capacity, false);
+}
+//通过boolean类型的参数可以控制使用公平锁还是非公平锁
+public ArrayBlockingQueue(int capacity, boolean fair) {
+    if (capacity <= 0)
+        throw new IllegalArgumentException();
+    this.items = new Object[capacity];
+    lock = new ReentrantLock(fair);
+    notEmpty = lock.newCondition();
+    notFull =  lock.newCondition();
+}
+```
+
+#### (2)、LinkedBlockingQueue
+
+LinkedBlockingQueue是一个用**单链表**实现的有界阻塞队列。此队列的默认长度和最大长度为`Integer.MAX_VALUE`。此队列按照先进先出的原则对元素进行排序。
+
+#### (3)、PriorityBlockingQueue
+
+一个支持线程优先级排序的无界队列，默认自然序进行排序，也可以自定义实现compareTo()方法来指定元素排序规则，不能保证同优先级元素的顺序。
+
+#### (4)、DelayQueue
+
+DelayQueue是一个支持延时获取元素的无界阻塞队列。队列基于PriorityBlockingQueue实现。队列中的元素必须实现Delayed接口，在创建元素是可以指定多久才能从队列中获取当前元素。DelayQueue可以用于 **缓存系统设计** 和 **定时任务调度** 这样的应用场景。
+
+#### (5)、SynchronousQueue
+
+SynchronousQueue是一个不存储元素的阻塞队列。每一个put操作必须等待一个take操作，否则不能继续添加元素。它支持公平访问队列。默认情况下线程采用非公共策略访问队列。**当使用公平锁的时候，等待的线程会采用先进先出的顺序访问队列**。
+
+```java
+//默认使用非公平锁
+public SynchronousQueue() {
+    this(false);
+}
+//通过boolean类型的参数可以控制使用公平锁还是非公平锁
+public SynchronousQueue(boolean fair) {
+    transferer = fair ? new TransferQueue<E>() : new TransferStack<E>();
+}
+```
+
+#### ( 6)、LinkedTransferQueue
+
+LinkedTransferQueue是一个由链表实现的无界阻塞Transfer队列。相对于其他阻塞队列，LinkedTransferQueue多了transfer和tryTransfer方法
+
+#### (7)、LinkedBlockingDeque
+
+LinkedBlockingDeque是一个由**双链表**实现的双向阻塞队列。队列头部和尾部都可以添加和移除元素，多线程并发时，可以将锁的竞争最多降到一半。
 
 
 
 ## 3.7 J.U.C原子类详解
+
+### 什么是CAS?
+
+CAS的全称为`Compare-And-Swap`，直译就是对比交换。是一条CPU的原子指令，其作用是让CPU先进行比较两个值是否相等，然后原子地更新某个位置的值，经过调查发现，其实现方式是基于硬件平台的汇编指令，就是说CAS是靠硬件实现的，JVM只是封装了汇编调用，那些AtomicInteger类便是使用了这些封装后的接口。   简单解释：CAS操作需要输入两个数值，一个旧值(期望操作前的值)和一个新值，在操作期间先比较下在旧值有没有发生变化，如果没有发生变化，才交换成新值，发生了变化则不交换。
+
+CAS操作是原子性的，所以多线程并发使用CAS更新数据时，可以不使用锁。JDK中大量使用了CAS来更新数据而防止加锁(synchronized 重量级锁)来保持原子更新。
+
+相信sql大家都熟悉，类似sql中的条件更新一样：update set id=3 from table where id=2。因为单条sql执行具有原子性，如果有多个线程同时执行此sql语句，只有一条能更新成功。
+
+
+
+### CAS会有哪些问题?
+
+CAS 方式为乐观锁，synchronized 为悲观锁。因此使用 CAS 解决并发问题通常情况下性能更优。
+
+但使用 CAS 方式也会有几个问题：
+
+- ABA问题
+
+因为CAS需要在操作值的时候，检查值有没有发生变化，比如没有发生变化则更新，但是如果一个值原来是A，变成了B，又变成了A，那么使用CAS进行检查时则会发现它的值没有发生变化，但是实际上却变化了。
+
+ABA问题的解决思路就是使用版本号。在变量前面追加上版本号，每次变量更新的时候把版本号加1，那么A->B->A就会变成1A->2B->3A。
+
+从Java 1.5开始，JDK的Atomic包里提供了一个类AtomicStampedReference来解决ABA问题。这个类的compareAndSet方法的作用是首先检查当前引用是否等于预期引用，并且检查当前标志是否等于预期标志，如果全部相等，则以原子方式将该引用和该标志的值设置为给定的更新值。
+
+- 循环时间长开销大
+
+自旋CAS如果长时间不成功，会给CPU带来非常大的执行开销。如果JVM能支持处理器提供的pause指令，那么效率会有一定的提升。pause指令有两个作用：第一，它可以延迟流水线执行命令(de-pipeline)，使CPU不会消耗过多的执行资源，延迟的时间取决于具体实现的版本，在一些处理器上延迟时间是零；第二，它可以避免在退出循环的时候因内存顺序冲突(Memory Order Violation)而引起CPU流水线被清空(CPU Pipeline Flush)，从而提高CPU的执行效率。
+
+- 只能保证一个共享变量的原子操作
+
+当对一个共享变量执行操作时，我们可以使用循环CAS的方式来保证原子操作，但是对多个共享变量操作时，循环CAS就无法保证操作的原子性，这个时候就可以用锁。
+
+
+
+### 阐述你对Unsafe类的理解?
+
+UnSafe类总体功能：
+
+![img](https://pdai.tech/images/thread/java-thread-x-atomicinteger-unsafe.png)
+
+Unsafe类可以用来直接访问和操作Java虚拟机中的内存，这包括直接修改对象的内部状态、分配内存、释放内存以及执行CAS（Compare-and-Swap）操作等。
+
+Unsafe类还可以用来执行本地方法调用，这允许Java代码与本地C或C++代码进行交互。
+
+
+
+
+
+# 四、Java IO
+
+## 4.1 IO 基础
+
+### 如何从数据传输方式理解IO流？
+
+从数据传输方式或者说是运输方式角度看，可以将 IO 类分为 `字节流` 和 `字符流`:
+
+1. **`字节流`**, 字节流读取单个字节，字符流读取单个字符(一个字符根据编码的不同，对应的字节也不同，如 UTF-8 编码中文汉字是 3 个字节，GBK编码中文汉字是 2 个字节。)
+2. **`字符流`**, 字节流用来处理二进制文件(图片、MP3、视频文件)，字符流用来处理文本文件(可以看做是特殊的二进制文件，使用了某种编码，人可以阅读)。
+
+针对不同字节流和字符流，Java提供了对应的IO类体系：
+
+* 字节流
+
+![img](https://pdai.tech/images/io/java-io-category-1.png)
+
+* 字符流
+
+![img](https://pdai.tech/images/io/java-io-category-2.png)
+
+### Java IO设计上使用了什么设计模式？
+
+**装饰者模式**： 所谓装饰，就是把这个装饰者套在被装饰者之上，从而动态扩展被装饰者的功能。
+
+- 以 InputStream 为例
+  - InputStream 是抽象组件；
+  - FileInputStream 是 InputStream 的子类，属于具体组件，提供了字节流的输入操作；
+  - FilterInputStream 属于抽象装饰者，装饰者用于装饰组件，为组件提供额外的功能。例如 BufferedInputStream 为 FileInputStream 提供缓存的功能。
+
+![image](https://pdai.tech/images/pics/DP-Decorator-java.io.png)
+
+实例化一个具有缓存功能的字节流对象时，只需要在 FileInputStream 对象上再套一层 BufferedInputStream 对象即可。
+
+```java
+FileInputStream fileInputStream = new FileInputStream(filePath);
+BufferedInputStream bufferedInputStream = new BufferedInputStream(fileInputStream);
+```
+
+DataInputStream 装饰者提供了对更多数据类型进行输入的操作，比如 int、double 等基本类型。
+
+
+
+## 4.2 5种IO模型
+
+### 什么是阻塞？什么是同步？
+
+- **阻塞IO 和 非阻塞IO**
+
+这两个概念是**程序级别**的。主要描述的是程序请求操作系统IO操作后，如果IO资源没有准备好，那么程序该如何处理的问题: 前者等待；后者继续执行(并且使用线程一直轮询，直到有IO资源准备好了)
+
+- **同步IO 和 非同步IO**
+
+这两个概念是**操作系统级别**的。主要描述的是操作系统在收到程序请求IO操作后，如果IO资源没有准备好，该如何响应程序的问题: 前者不响应，直到IO资源准备好以后；后者返回一个标记(好让程序和自己知道以后的数据往哪里通知)，当IO资源准备好以后，再用事件机制返回给程序。
+
+
+
+### 什么是Linux的IO模型？
+
+网络IO的本质是socket的读取，socket在linux系统被抽象为流，IO可以理解为对流的操作。刚才说了，对于一次IO访问（以read举例），**数据会先被拷贝到操作系统内核的缓冲区中，然后才会从操作系统内核的缓冲区拷贝到应用程序的地址空间**。所以说，当一个read操作发生时，它会经历两个阶段：
+
+- 第一阶段：等待数据准备 (Waiting for the data to be ready)。
+- 第二阶段：将数据从内核拷贝到进程中 (Copying the data from the kernel to the process)。
+
+对于socket流而言，
+
+- 第一步：通常涉及等待网络上的数据分组到达，然后被复制到内核的某个缓冲区。
+- 第二步：把数据从内核缓冲区复制到应用进程缓冲区。
+
+网络应用需要处理的无非就是两大类问题，网络IO，数据计算。相对于后者，网络IO的延迟，给应用带来的性能瓶颈大于后者。网络IO的模型大致有如下几种：
+
+1. 同步阻塞IO（bloking IO）
+2. 同步非阻塞IO（non-blocking IO）
+3. 多路复用IO（multiplexing IO）
+4. 信号驱动式IO（signal-driven IO）
+5. 异步IO（asynchronous IO）
+
+![img](https://pdai.tech/images/io/java-io-compare.png)
+
+#### 什么是同步阻塞IO？
+
+应用进程被阻塞，直到数据复制到应用进程缓冲区中才返回。
+
+![img](https://pdai.tech/images/io/java-io-model-0.png)
+
+
+
+#### 什么是同步非阻塞IO？
+
+应用进程执行系统调用之后，内核返回一个错误码。应用进程可以继续执行，但是需要不断的执行系统调用来获知 I/O 是否完成，这种方式称为轮询(polling)。
+
+![img](https://pdai.tech/images/io/java-io-model-1.png)
+
+#### 什么是多路复用IO？
+
+系统调用可能是由多个任务组成的，所以可以拆成多个任务，这就是多路复用。
+
+使用 `select` 或者 `poll` 等待数据，并且可以等待多个套接字中的任何一个变为可读，这一过程会被阻塞，当某一个套接字可读时返回。之后再使用 `recvfrom` 把数据从内核复制到进程中。
+
+它可以让单个进程具有处理多个 I/O 事件的能力。又被称为 Event Driven I/O，即事件驱动 I/O。
+
+![img](https://pdai.tech/images/io/java-io-model-2.png)
+
+
+
+##### 有哪些多路复用IO实现？
+
+目前流程的多路复用IO实现主要包括四种: `select`、`poll`、`epoll`、`kqueue`。下表是他们的一些重要特性的比较:
+
+| IO模型 | 相对性能 | 关键思路         | 操作系统      | JAVA支持情况                                                 |
+| ------ | -------- | ---------------- | ------------- | ------------------------------------------------------------ |
+| select | 较高     | Reactor          | windows/Linux | 支持,Reactor模式(反应器设计模式)。Linux操作系统的 kernels 2.4内核版本之前，默认使用select；而目前windows下对同步IO的支持，都是select模型 |
+| poll   | 较高     | Reactor          | Linux         | Linux下的JAVA NIO框架，Linux kernels 2.6内核版本之前使用poll进行支持。也是使用的Reactor模式 |
+| epoll  | 高       | Reactor/Proactor | Linux         | Linux kernels 2.6内核版本及以后使用epoll进行支持；Linux kernels 2.6内核版本之前使用poll进行支持；另外一定注意，由于Linux下没有Windows下的IOCP技术提供真正的 异步IO 支持，所以Linux下使用epoll模拟异步IO |
+| kqueue | 高       | Proactor         | Linux         | 目前JAVA的版本不支持                                         |
+
+多路复用IO技术最适用的是“高并发”场景，所谓高并发是指1毫秒内至少同时有上千个连接请求准备好。其他情况下多路复用IO技术发挥不出来它的优势。另一方面，使用JAVA NIO进行功能实现，相对于传统的Socket套接字实现要复杂一些，所以实际应用中，需要根据自己的业务需求进行技术选择。
+
+
+
+#### 什么是信号驱动IO？
+
+应用进程使用 `sigaction` 系统调用，内核立即返回，应用进程可以继续执行，也就是说等待数据阶段应用进程是非阻塞的。内核在数据到达时向应用进程发送 SIGIO 信号，应用进程收到之后在信号处理程序中调用 `recvfrom `将数据从内核复制到应用进程中。
+
+相比于非阻塞式 I/O 的轮询方式，信号驱动 I/O 的 CPU 利用率更高。
+
+![img](https://pdai.tech/images/io/java-io-model-3.png)
+
+
+
+#### 什么是异步IO？
+
+相对于同步IO，异步IO不是顺序执行。用户进程进行`aio_read`系统调用之后，无论内核数据是否准备好，都会直接返回给用户进程，然后用户态进程可以去做别的事情。等到socket数据准备好了，内核直接复制数据给进程，然后从内核向进程发送通知。IO两个阶段，进程都是非阻塞的。
+
+![img](https://pdai.tech/images/io/java-io-model-4.png)
+
+Linux提供了AIO库函数实现异步，但是用的很少。目前有很多开源的异步IO库，例如`libevent`、`libev`、`libuv`
+
+
+
+### 什么是Reactor模型？
+
+大多数网络框架都是基于Reactor模型进行设计和开发，Reactor模型基于事件驱动，特别适合处理海量的I/O事件。
+
+ 
+
+#### **传统的IO模型**？
+
+这种模式是传统设计，每一个请求到来时，大致都会按照：请求读取->请求解码->服务执行->编码响应->发送答复 这个流程去处理。
+
+![img](https://pdai.tech/images/io/java-io-reactor-1.png)
+
+服务器会分配一个线程去处理，如果请求暴涨起来，那么意味着需要更多的线程来处理该请求。若请求出现暴涨，线程池的工作线程数量满载那么其它请求就会出现等待或者被抛弃。若每个小任务都可以使用非阻塞的模式，然后基于异步回调模式。这样就大大提高系统的吞吐量，这便引入了Reactor模型。
+
+
+
+#### Reactor 模型？
+
+- **Reactor模型中定义的三种角色**：
+
+1. **Reactor**：负责监听和分配事件，将I/O事件分派给对应的Handler。新的事件包含连接建立就绪、读就绪、写就绪等。
+2. **Acceptor**：处理客户端新连接，并分派请求到处理器链中。
+3. **Handler**：将自身与事件绑定，执行非阻塞读/写任务，完成channel的读入，完成处理业务逻辑后，负责将结果写出channel。可用资源池来管理。
+
+
+
+##### **单Reactor单线程模型**
+
+Reactor线程负责多路分离套接字，accept新连接，并分派请求到handler。Redis使用单Reactor单进程的模型。
+
+![img](https://pdai.tech/images/io/java-io-reactor-2.png)
+
+消息处理流程：
+
+1. Reactor对象通过select监控连接事件，收到事件后通过dispatch进行转发。
+2. 如果是连接建立的事件，则由acceptor接受连接，并创建handler处理后续事件。
+3. 如果不是建立连接事件，则Reactor会分发调用Handler来响应。
+4. handler会完成read->业务处理->send的完整业务流程。
+
+
+
+##### 单Reactor多线程模型
+
+将handler的处理池化。
+
+![img](https://pdai.tech/images/io/java-io-reactor-3.png)
+
+
+
+##### **多Reactor多线程模型**
+
+主从Reactor模型： 主Reactor用于响应连接请求，从Reactor用于处理IO操作请求，读写分离了。
+
+![img](https://pdai.tech/images/io/java-io-reactor-4.png)
+
+
+
+### 什么是Java NIO？
+
+Java NIO主要有三大核心部分：Channel(通道)，Buffer(缓冲区), Selector。**传统IO基于字节流和字符流进行操作**，而**NIO基于Channel和Buffer(缓冲区)进行操作**，数据总是从通道读取到缓冲区中，或者从缓冲区写入到通道中。Selector(选择区)用于监听多个通道的事件（比如：连接打开，数据到达）。因此，单个线程可以监听多个数据通道。
+
+NIO和传统IO（一下简称IO）之间第一个最大的区别是，IO是面向流的，NIO是面向缓冲区的。
+
+![img](https://pdai.tech/images/io/java-io-nio-x.png)
+
+1. `Channel`：表示一个可以进行读写操作的对象，类似于传统的流，但可以同时进行读写操作。
+2. `Buffer`：用于存储数据，可以在 Channel 和应用程序之间传递数据。
+3. `Selector`：用于监控多个 Channel 的状态，可以同时处理多个 Channel 的 I/O 操作，从而实现非阻塞 I/O。
+
+当一个 Channel 注册到 Selector 中时，Selector 会开始监听该 Channel 的状态。如果 Channel 可读或可写，Selector 就会通知应用程序进行读写操作。此时应用程序可以使用 Buffer 读取或写入数据，然后再将 Buffer 写入到 Channel 中。
+
+由于 Selector 可以同时监控多个 Channel 的状态，因此可以实现高效的多路复用，从而处理大量的并发连接。与传统的阻塞 I/O 不同，NIO 可以实现非阻塞的 I/O 操作，当没有数据可读或可写时，程序不会被阻塞，可以更高效地利用系统资源，同时可以更好地处理并发连接。
+
+
+
+## 4.3 零拷贝
+
+### 传统的IO存在什么问题？为什么引入零拷贝的？
+
+如果服务端要提供文件传输的功能，我们能想到的最简单的方式是：将磁盘上的文件读取出来，然后通过网络协议发送给客户端。
+
+传统 I/O 的工作方式是，数据读取和写入是从用户空间到内核空间来回复制，而内核空间的数据是通过操作系统层面的 I/O 接口从磁盘读取（`read()`）或写入（`write()`）。
+
+![img](https://pdai.tech/images/io/java-io-copy-3.png)
+
+首先，**期间共发生了 4 次用户态与内核态的上下文切换**，因为发生了两次系统调用，一次是 read() ，一次是 write()，每次系统调用都得先从用户态切换到内核态，等内核完成任务后，再从内核态切换回用户态。
+
+上下文切换到成本并不小，一次切换需要耗时几十纳秒到几微秒，虽然时间看上去很短，但是在高并发的场景下，这类时间容易被累积和放大，从而影响系统的性能。
+
+其次，还发生了 **4 次数据拷贝**，其中**两次是 DMA 的拷贝**，另外**两次则是通过 CPU 拷贝**的，下面说一下这个过程：
+
+- **第一次拷贝**，把磁盘上的数据拷贝到操作系统内核的缓冲区里，这个拷贝的过程是通过 DMA 搬运的。
+- **第二次拷贝**，把内核缓冲区的数据拷贝到用户的缓冲区里，于是我们应用程序就可以使用这部分数据了，这个拷贝到过程是由 CPU 完成的。
+- **第三次拷贝**，把刚才拷贝到用户的缓冲区里的数据，再拷贝到内核的 socket 的缓冲区里，这个过程依然还是由 CPU 搬运的。
+- **第四次拷贝**，把内核的 socket 缓冲区里的数据，拷贝到网卡的缓冲区里，这个过程又是由 DMA 搬运的。
+
+回过头看这个文件传输的过程，我们只是搬运一份数据，结果却搬运了 4 次，过多的数据拷贝无疑会消耗 CPU 资源，大大降低了系统性能。
+
+这种简单又传统的文件传输方式，存在冗余的上文切换和数据拷贝，在高并发系统里是非常糟糕的，多了很多不必要的开销，会严重影响系统性能。
+
+所以，**要想提高文件传输的性能，就需要减少「用户态与内核态的上下文切换」和「内存拷贝」的次数**。
+
+
+
+### mmap + write怎么实现的零拷贝？
+
+在前面我们知道，read() 系统调用的过程中会把内核缓冲区的数据拷贝到用户的缓冲区里，于是为了减少这一步开销，我们可以用 mmap() 替换 read() 系统调用函数。
+
+mmap() 系统调用函数会直接把内核缓冲区里的数据「映射」到用户空间，这样，操作系统内核与用户空间就不需要再进行任何的数据拷贝操作。
+
+![img](https://pdai.tech/images/io/java-io-copy-4.png)
+
+
+
+具体过程如下：
+
+- 应用进程调用了 mmap() 后，DMA 会把磁盘的数据拷贝到内核的缓冲区里。接着，应用进程跟操作系统内核「共享」这个缓冲区；
+- 应用进程再调用 write()，操作系统直接将内核缓冲区的数据拷贝到 socket 缓冲区中，这一切都发生在内核态，由 CPU 来搬运数据；
+- 最后，把内核的 socket 缓冲区里的数据，拷贝到网卡的缓冲区里，这个过程是由 DMA 搬运的。
+
+我们可以得知，通过使用 mmap() 来代替 read()， 可以减少一次数据拷贝的过程。
+
+但这还不是最理想的零拷贝，因为仍然需要通过 CPU 把内核缓冲区的数据拷贝到 socket 缓冲区里，而且仍然需要 4 次上下文切换，因为系统调用还是 2 次。
+
+
+
+### sendfile怎么实现的零拷贝？
+
+在 Linux 内核版本 2.1 中，提供了一个专门发送文件的系统调用函数 sendfile()，函数形式如下：
+
+```c
+#include <sys/socket.h>
+ssize_t sendfile(int out_fd, int in_fd, off_t *offset, size_t count);
+```
+
+它的前两个参数分别是`目的端`和`源端`的文件描述符，后面两个参数是`源端的偏移量`和`复制数据的长度`，返回值是实际复制数据的长度。
+
+首先，它可以替代前面的 read() 和 write() 这两个系统调用，这样就可以减少一次系统调用，也就减少了 2 次上下文切换的开销。
+
+其次，该系统调用，可以直接把内核缓冲区里的数据拷贝到 socket 缓冲区里，不再拷贝到用户态，这样就只有 2 次上下文切换，和 3 次数据拷贝。如下图：
+
+![img](https://pdai.tech/images/io/java-io-copy-5.png)
+
+但是这还不是真正的零拷贝技术，如果网卡支持 SG-DMA（**The Scatter-Gather Direct Memory Access**）技术（和普通的 DMA 有所不同），我们可以进一步减少通过 CPU 把内核缓冲区里的数据拷贝到 socket 缓冲区的过程。
+
+你可以在你的 Linux 系统通过下面这个命令，查看网卡是否支持 scatter-gather 特性：
+
+```sh
+$ ethtool -k eth0 | grep scatter-gather
+scatter-gather: on
+```
+
+于是，从 Linux 内核 2.4 版本开始起，对于支持网卡支持 SG-DMA 技术的情况下， sendfile() 系统调用的过程发生了点变化，具体过程如下：
+
+- 第一步，通过 DMA 将磁盘上的数据拷贝到内核缓冲区里；
+- 第二步，缓冲区描述符和数据长度传到 socket 缓冲区，这样网卡的 SG-DMA 控制器就可以直接将内核缓存中的数据拷贝到网卡的缓冲区里，此过程不需要将数据从操作系统内核缓冲区拷贝到 socket 缓冲区中，这样就减少了一次数据拷贝；
+
+所以，这个过程之中，只进行了 2 次数据拷贝，如下图：
+
+![img](https://pdai.tech/images/io/java-io-copy-6.png)
+
+这就是所谓的**零拷贝（Zero-copy）技术，因为我们没有在内存层面去拷贝数据，也就是说全程没有通过 CPU 来搬运数据，所有的数据都是通过 DMA 来进行传输的**。
+
+零拷贝技术的文件传输方式相比传统文件传输的方式，**减少了 2 次上下文切换和数据拷贝次数，只需要 2 次上下文切换和数据拷贝次数，就可以完成文件的传输，而且 2 次的数据拷贝过程，都不需要通过 CPU，2 次都是由 DMA 来搬运**。
+
+
+
+# 五、JVM和调优
+
+## 5.1 类加载机制
+
+### 类加载生命周期？
+
+类从被加载到虚拟机内存中开始，到卸载出内存为止，他的整个生命周期包括：**加载（Loading）**、**验证（Verify）**、**准备（Prepare）**、**解析（Resolve）**、**初始化（Initialization）**、**使用（Using）** 和**卸载（Unloading）**7个阶段。其中验证、准备和解析可以合起来统称为链接（Linking）。各个阶段的发生顺序：
+
+<img src="http://image.easyblog.top/15813276429581b8a5e4a-b04d-4965-8ce5-ae24b2948fd1.jpg" alt="img"/>
+
+#### **加载**
+
+**（1）类加载时机**
+
+Java虚拟机中并没有明确规定类的加载时机，这个不同的虚拟机产品会有不同的实现。但是Java虚拟机规范中对于类的初始化阶段有明确的规定，当出现以下5种情况时必须立即对类进行初始化（间接说明了类的5种加载的时机）：
+
+1. 当使用new关键字实例化对象、读取或设置一个类的静态字段、调用一个类的静态方法的时候
+2. 使用java.lang.reflect包的方法对类进行反射调用的时候，如果类还没有初始化过，则需要初始化
+3. 当初始化一个类的时候如果发现他的父类还没有初始化，那么需要先初始化父类
+4. 当虚拟机启动的时候，用户指定的执行主类（含有main方法的那个类）会优先初始化这个类
+5. 当使用动态语言支持时如果一个java.lang.invoke.MethodHandle实例最后的解析结果为RET_getStatic、RET_putStatic、RET_invokeStatic的方法句柄，并且这个方法句柄所在的类没有进行初始化，则需要先初始化。
+
+**（2）类加载流程**
+
+在加载阶段，JVM完成下面3件事：
+
+1. 通过一个类的全限定名来获取定义此类的二进制字节流
+2. 将字节流所代表的静态存储结构转化为方法区的运行时数据结构
+3. **在内存中生成一个代表这个类的java.lang.Class对象**，作为方法区这个类的各种数据的访问接口
+
+总结一下，加载阶段JVM的工作就是：**将类.class字节码文件中的二进制数据读入到内存中，将其放在运行时数据区的方法区内，然后在堆区创建一个java.lang.Class对象，用来封装类在方法区中的数据结构**
+
+
+
+#### 链接
+
+链接阶段具体有三个过程：**验证、准备和解析**。 
+
+**（1）验证阶段**： **验证是链接的第一步，这一步的作用是为了确保class文件中字节流包含的信息符合虚拟机的要求，并且不会危害虚拟机的自生安全**。
+
+> ​    验证大致上会完成下面4个阶段的检查动作：**文件格式验证**、**元数据验证**、**字节码验证**和**符号引用验证**。如果输入的字节流不符合class文件格式的约定，JVM就会抛出一个java.lang.VerifyError异常或其子类异常。
+
+**Tips**：虚拟机的类加载机制中，验证阶段绝对是非常重要的一个阶段，但是它并不是必要的阶段。如果我们的程序（无论是我们自己写的还是第三方的）都已经被反复使用和验证的情况下，那么在真正运行的时候就可以考虑使用`-Xverify:none`来关闭大部分的类验证措施，以缩短类加载的时间。
+
+**（2）准备阶段**
+
+准备阶段是**JVM正式为类变量分配内存并为类变量设置初始值的阶段**，这些变量所使用的内存将在方法区中进行分配。**不过要清楚几点是**：
+
+1）这个阶段给类变量设置的初始值并不是变量后面有程序员指定的值，而是统一设置为零值。正真指定的值这时是存放在类构造器<clinit>()方法中，例如下面的例子：
+
+```css
+ public static int a=100;   //在准备阶段变量a会在方法区中分得内存并被赋初值为0，之后又会在初始化阶段初始化为100
+```
+
+（2）即被static修饰同时又被final修饰的常量由于在编译的时候就被分配值了，准备阶段只会显示的初始化，也即准备阶段不会管这些常量的。 
+
+（3）这里只会为一个类中的类变量分配内存并初始化零值，实例变量将会在对象实例化的时候随对象一起分>配在Java堆中。
+
+**（3）解析阶段**
+
+ 解析阶段是**JVM将常量池的符号引用转换为直接引用的过程**。解析操作主要针对的类或接口、字段、类方法、接口方法、方法类型、方法句柄和调用点限定7类符号限定引用进行。
+
+
+
+**初始化（Initialization）**
+
+初始化阶段是类加载过程的最后一个阶段，到了这一步才正真开始执行类中定义的Java程序代码。**初始化阶段就是系统给类变量赋指定值并且执行静态代码块的阶段，或者说初始化阶段是执行类构造器`<clinit>()`方法的过程。**关于 **`<clinit>()`** 方法我们还需要知道下面几点：
+
+1. `<clinit>()`方法是由javac编译器自动收集类中所有类变量的赋值动作和静态代码块中的语句合并而来，不需要人为定义。
+2. `<clinit>()`方法虽然叫类构造器，但它与类的构造函数（类的构造函数在虚拟机视角下是`<init>()`方法）不同，他不需要显示的调用父类构造器，虚拟机会保证在子类的`<clinit>()`方法执行前，父类的`<clinit>()`方法已经执行完毕。
+3. `<clinit>()`方法不是必须的，如果一个类中即没有静态语句块，也没有类变量，那么编译器就可以不为这个类生成`<clinit>()`方法。
+4. 虚拟机会保证一个类的`<clinit>()`方法在多线程环境中被正确地加锁、同步。如果有多个线程同时去初始化一个类，那么只会有一个线程去执行这个类的`<clinit>()`方法，其他的线程都会阻塞。
+
+
+
+### 类加载器的层次？
+
+从JVM的角度来讲，只存在两种不同的类加载器：引导类加载器（Bootstrap ClassLoader）和用户自定义类加载器。之所以这样划分是因为引导类加载器是使用C++实现的，它是虚拟机的一部分，而其他的加载器（比如扩展类加载器、应用类加载器......）都是使用Java语言实现的，独立于虚拟机外部，并且都直接或间接的继承自`java.lang.ClassLoader`这个抽象类。
+
+但是从Java开发人员的角度来看，JVM的类加载器可以细分为以下几种：
+
+**（1）启动类加载器（Bootstrap ClassLoader）**
+
+* 1）启动类加载器使用C++语言实现，它是JVM的组成部分 
+* 2）它用来加载Java的核心类库（`$JAVA_HOME/jre/lib/rt.jar`、`resoures.jar`，`sun.boot.class.path`路径下的内容），用于提供JVM自身需要的类（大致就是以java、javax、sun开头的类库） 
+* 3）由于是使用C++实现的，因此它不继承自java.lang.Classloader，也没有父加载器，并且启动类加载器无法被Java程序直接引用，如果尝试获取启动类加载器，那么一定返回的是null
+
+**（2）扩展类加载器（Extension ClassLoader）**
+
+由Java语言实现，具体的实现在`sun.misc.Launcher$ExtClassLoader`这个内部类中，他派生与ClassLoader，主要负责加载`$JAVA_HOME/jre/lib/ext`目录中的类库，或者被java.ext.dirs系统变量所指定的路径中的所有类库。
+
+**（3）应用类加载器（Application ClassLoder）**
+
+由`sun.misc.Launcher$AppClassLoader`实现。由于这个类加载器是ClassLoader中getSystemClassLaoder()方法的返回值，因此也称其为系统类加载器。它一般负责加载用户路径（ClassPath）上的类库，我们自己写的类一般情况下就是通过这个类加载器加载的。下图时ClassLoader、ExtClassLoader、AppClassloader之间在语言层面的继承关系
+
+
+
+### 双亲委派机制？
+
+<img src="http://image.easyblog.top/15813186368441321d601-da6e-4b34-a8cf-1e7dc59fb779.jpg" alt="img" style="zoom:40%;" />
+
+#### 双亲委派机制工作原理
+
+* 1）如果一个类加载器收到了类加载的请求，他不会自己立即去加载，而是把这个加载请求委托给父级加载器执行加载请求；
+* 2）如果一个父级加载器还存在父级加载器，则进一步向上委托，依次递归，请求最终会传达到最顶层的启动类加载器；
+* 3）如果父级加载器可以完成加载任务，就成功返回，倘若父级加载器无法完成加载任务，则它的子级类加载器才会尝试自己加载，如果还是不行在给子级加载器的子级加载器去加载，这就是双亲委派机制。
+
+**需要注意的是**： 1. 双亲委派模型示意图所展示的不是几种类加载器的继承关系，而是他们在加载一个类的时候的委托关系（优先级关系），而这些类本质上也并不存在继承关系，示意图中所展示的只是一种层级（阶级）关系 2. 一个类如果所有的类加载器都加载失败，那么系统就会抛出`ClassNotFoundException`异常
+
+另外，双亲委派机制实在ClassLoader类的loadClass()方法中实现的，因此如果不想使用算清委派机制，可以重写这个方法，但是一般不建议重写该方法。
+
+
+
+#### 双亲委派机制的好处（为什么需要双亲委派机制？）
+
+* 1）可以避免一个类被重复加载 
+* 2）可以保护程序安全，尤其是核心API不会遭到随意篡改
+
+
+
+### 如何破坏双亲委派模型
+
+重写ClassLoader类的`loadClass()`方法，别重写`findClass`方法，因为`loadClass`是核心入口，将其重写成自定义逻辑即可破坏双亲委派模型。
+
+
+
+### 如何自定义类加载器
+
+只需要继承`java.lang.Classloader`类，然后覆盖他的`findClass(String name)`方法即可，该方法根据参数指定的类名称，返回对应 的Class对象的引用。
+
+**自定义类加载器示例**
+
+**自定义类加载器 CustomClassLoader：** 继承ClassLoader，重写findClass()方法，在findClass方法中使用文件IO将需要加载的类读取到byte数组中就OK了，之后交给defineClass方法处理就可以了。
+
+```java
+public class CustomClassLoader extends ClassLoader {
+
+    //类的路径
+    private String classPath;
+
+    public CustomClassLoader(String classPath) {
+        this.classPath = classPath;
+    }
+
+    //name表示这个类的类的全限定名
+    @Override
+    protected Class<?> findClass(String name) throws ClassNotFoundException {
+        byte[] bytes = null;
+        InputStream is = null;
+		//将类名中的.转换为路径符号/
+        name = name.replaceAll("\\.", "/");
+        ByteArrayOutputStream out = new ByteArrayOutputStream();
+        try {
+		    //读取class文件的流
+            is = new FileInputStream(new File(classPath+"/"+name+".class"));
+            int len = 0;
+            while (-1 != (len = is.read())) {
+                out.write(len);
+            }
+            bytes = out.toByteArray();
+        } catch (Exception e) {
+            e.printStackTrace();
+        }finally {
+            try {
+                assert is != null;
+                is.close();
+                out.close();
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
+        }
+        if(bytes==null){
+            throw new ClassNotFoundException();
+        }
+        return defineClass(name,bytes,0,bytes.length);
+    }
+}
+```
+
+**测试代码**
+
+```java
+public class AppTest {
+
+    @Test
+    public void test(){
+        try {
+            //Car E:\IDE Java Files\LeetCode\algorithm\src\main\java\algorithm\greedy\Car.java
+            CustomClassLoader classLoader = new CustomClassLoader("E:\\IDE Java Files\\LeetCode\\algorithm\\src\\main\\java");
+            Class clazz = classLoader.loadClass("algorithm.greedy.Car");
+            Object o = clazz.newInstance();
+            Method print = clazz.getDeclaredMethod("print", null);
+            print.invoke(o, null);
+           /* Car car = new Car();
+            car.print();*/
+        }catch (Exception e){
+            e.printStackTrace();
+        }
+    }
+
+}
+```
+
+
+
+### 热部署原理
+
+采取破坏双亲委派模型的手段来实现热部署，默认的`loadClass()`方法先找缓存，你改了class字节码也不会热加载，所以自定义ClassLoader，去掉找缓存那部分，直接就去加载，也就是每次都重新加载。
+
+
+
+## 5.2 JVM内存结构
+
+### JVM内存整体结构？
+
+<img src="https://image.easyblog.top/jvm-pic.jpg"  />
+
+Java 虚拟机定义了若干种程序运行期间会使用到的运行时数据区，其中有一些会随着虚拟机启动而创建，随着虚拟机退出而销毁。另外一些则是与线程一一对应的，这些与线程一一对应的数据区域会随着线程开始和结束而创建和销毁。
+
+- **线程私有**：`程序计数器`、`虚拟机栈`、`本地方法栈`
+- **线程共享**：`堆`、`方法区`, `堆外内存`（Java7的永久代或JDK8的元空间、代码缓存）
+
+
+
+### 什么是程序计数器？
+
+程序计数器（`Program Conputer Register`）这是一块较小的内存空间，可以看做是当前线程所执行的字节码的行号指示器，在虚拟机的概念模型里，字节码解释器的工作就是通过改变这个计数器的值来选取下一条需要执行的字节码指令，分支、循环、跳转、异常处理、线程恢复等基础功能都需要依赖这个计数器来完成。
+
+**①、线程私有**
+
+Java虚拟机支持多线程，是通过线程轮流切换并分配处理器执行时间的方式来实现的，在任一确定的时刻，一个处理器只会执行一条线程中的指令，因此为了线程切换后能恢复到正确的执行位置，每条线程都需要一个独立的程序计数器。因此线程启动时，JVM 会为每个线程分配一个PC寄存器（Program Conter，也称程序计数器）。
+
+**②、记录当前字节码指令执行地址**
+
+如果当前线程执行的是一个Java方法，这个计数器记录的是正在执行的虚拟机字节码指令的地址；如果正在执行的是 Native 方法，则这个计数器值为空（Undefined）。
+
+**③、不抛 OutOfMemoryError 异常**
+
+程序计数器的空间大小不会随着程序执行而改变，始终只是保存一个 returnAdress 类型的数据或者一个与平台相关的本地指针的值。所以该区域是Java运行时内存区域中唯一一个Java虚拟机规范中没有规定任何 OutOfMemoryError 情况的区域。
+
+
+
+
+
+> **PC寄存器为什么会被设定为线程私有的？**
+>
+> 多线程在一个特定的时间段内只会执行其中某一个线程方法，CPU会不停的做任务切换，这样必然会导致经常中断或恢复。为了能够准确的记录各个线程正在执行的当前字节码指令地址，所以为每个线程都分配了一个PC寄存器，每个线程都独立计算，不会互相影响。
+
+
+
+### 什么是虚拟机栈？
+
+Java虚拟机栈（`Java Virtual Machine stack`），这块区域也是线程私有的，与线程同时创建，用于存储栈帧。Java 每个方法执行的时候都会同时创建一个栈帧（Stack Frame）用于存储局部变量表、操作栈、动态链接、方法出口等信息，每一个方法被调用直至执行完成的过程，就对应着一个栈帧在虚拟机栈中从入栈到出栈的过程。
+
+<img src="https://images2018.cnblogs.com/blog/1120165/201807/1120165-20180722152410736-914758638.png" alt="img"/>
+
+**①、线程私有**
+
+随线程创建而创建，声明周期和线程保持一致。
+
+**②、由栈帧组成**
+
+线程每个方法被执行的时候都会创建一个栈帧，用于存储**局部变量表、操作栈、动态链接、方法出口**等信息，每一个方法被调用直至执行完成的过程，就对应着一个栈帧在虚拟机栈中从入栈到出栈的过程。
+
+**③、抛出 StackOverflowError 和 OutOfMemoryError 异常**
+
+如果线程请求的栈深度大于虚拟机所允许的深度，将抛出 StackOverflowError 异常；如果虚拟机栈可以动态扩展，当扩展时无法申请到足够的内存时会抛出 OutOfMemoryError 异常。
+
+
+
+
+
+
+
+### 什么是本地方法栈？
+
+本地方法栈（Native Method Stacks）作用和虚拟机栈类型，虚拟机栈执行的是Java方法，本地方法栈执行的是 Native 方法，本地方法栈也会抛出抛出 StackOverflowError 和 OutOfMemoryError 异常。
+
+注意：由于虚拟机规范并没有对本地方法栈中的方法使用语言、使用方式和数据结构强制规定，因此具体的虚拟机可以自由实现它。上图我们也给出在 HotSpot 虚拟机中，本地方法栈和虚拟机栈合为一体了。
+
+
+
+### 什么是Java堆？
+
+Java堆是Java虚拟机所管理内存最大、被所有线程共享的一块区域，目的是用来存放对象，基本上所有的对象实例和数组都在堆上分配（不是绝对）。Java堆也是垃圾回收器管理的主要区域。
+
+**①、线程共享**
+
+堆存放的对象，某个线程修改了对象属性，另外一个线程从堆中获取的该对象是修改后的对象，为什么堆要设计成线程共享呢？
+
+我们可以假设堆是线程私有的，很显然一个系统创建的对象会有很多，而且有些对象会比较大，如果设计成线程私有的，那么如果有很多线程同时工作，那么都必须给他们分配相应的私有内存，我相信内存很快就撑爆了，很显然将堆设计为线程共享是最好不过了，不过凡事都具有两面性，线程共享的设计这也带来了**多线程并发资源冲突问题**，关于这个问题由于不是本系列博客的主旨，这里就不做详细介绍了。
+
+**②、存放对象**
+
+基本上所有的对象实例和数组都要在堆上进行分配，但是随着 JIT 编译器的发展和逃逸分析技术的成熟，栈上分配、标量替换等优化技术会导致对象不一定在堆上进行分配。
+
+**③、垃圾收集**
+
+　　Java堆也被称为“GC堆”，是垃圾回收器的主要操作内存区域。当前垃圾回收器都是使用的分代收集算法，所以Java堆还可以分为：新生代和老年代，而新生代又可以分为 Eden 空间、From Survivor 空间、To Survivor空间。这是为了更好的回收内存，关于垃圾回收算法在后续博客会详细介绍。
+
+<img src="http://image.easyblog.top/1581945296692366e8ad8-8995-4e99-9631-e5e9e10b617b.png" alt="img"  />
+
+**④、抛出 OutOfMemoryError 异常**
+
+　　根据Java虚拟机规范，Java堆可以处于物理上不连续的内存空间中，只要逻辑上连续即可，实现时既可以实现成固定大小，也可以是扩展的。如果在堆中没有完成实例分配，并且堆也无法扩展，将抛出OutOfMemoryError 异常。
+
+
+
+### 堆区内存是怎么细分的？
+
+对于大多数应用，Java 堆是 Java 虚拟机管理的内存中最大的一块，被所有线程共享。此内存区域的唯一目的就是存放对象实例，几乎所有的对象实例以及数据都在这里分配内存。
+
+为了进行高效的垃圾回收，虚拟机把堆内存**逻辑上**划分成三块区域（分代的唯一理由就是优化 GC 性能）：
+
+1. 新生带（年轻代）：新对象和没达到一定年龄的对象都在新生代
+2. 老年代（养老区）：被长时间使用的对象，老年代的内存空间应该要比年轻代更大
+
+<img src="http://image.easyblog.top/1581945296692366e8ad8-8995-4e99-9631-e5e9e10b617b.png" alt="img"  />
+
+Java 虚拟机规范规定，Java 堆可以是处于物理上不连续的内存空间中，只要逻辑上是连续的即可，像磁盘空间一样。实现时，既可以是固定大小，也可以是可扩展的，主流虚拟机都是可扩展的（通过 `-Xmx` 和 `-Xms` 控制），如果堆中没有完成实例分配，并且堆无法再扩展时，就会抛出 `OutOfMemoryError` 异常。
+
+- **年轻代 (Young Generation)**
+
+年轻代是所有新对象创建的地方。当填充年轻代时，执行垃圾收集。这种垃圾收集称为 **Minor GC**。年轻一代被分为三个部分——伊甸园（**Eden Memory**）和两个幸存区（**Survivor Memory**，被称为from/to或s0/s1），默认比例是`8:1:1`
+
+1. 大多数新创建的对象都位于 Eden 内存空间中
+2. 当 Eden 空间被对象填充时，执行**Minor GC**，并将所有幸存者对象移动到一个幸存者空间中
+3. Minor GC 检查幸存者对象，并将它们移动到另一个幸存者空间。所以每次，一个幸存者空间总是空的
+4. 经过多次 GC 循环后存活下来的对象被移动到老年代。通常，这是通过设置年轻一代对象的年龄阈值来实现的，然后他们才有资格提升到老一代
+
+- **老年代(Old Generation)**
+
+旧的一代内存包含那些经过许多轮小型 GC 后仍然存活的对象。通常，垃圾收集是在老年代内存满时执行的。老年代垃圾收集称为 主GC（Major GC），通常需要更长的时间。
+
+大对象直接进入老年代（大对象是指需要大量连续内存空间的对象）。这样做的目的是避免在 Eden 区和两个Survivor 区之间发生大量的内存拷贝
+
+
+
+### JVM中对象的分配过程?
+
+![](http://image.easyblog.top/1680337604178b58041a8-1c86-410b-8294-06f3eddc2924.png)
+
+对象分配过程：
+
+- 1）依据**逃逸分析**，判断是否能栈上分配？
+  - 如果可以，使用标量替换方式，把对象分配到`VM Stack`中。如果 线程销毁或方法调用结束后，自动销毁，不需要 GC 回收器 介入。
+  - 否则，继续下一步。
+- 2）判断是否大对象？
+  - 如果是，直接分配到堆上 `Old Generation` 老年代上。如果对象变为垃圾后，由老年代GC 收集器（比如 Parallel Old, CMS, G1）回收。
+  - 否则，继续下一步。
+- 3）判断是否可以在 `TLAB`中分配？
+  - 如果是，在 `TLAB`中分配堆上`Eden`区。
+  - 否则，在 `TLAB`外堆上的`Eden`区分配。
+
+
+
+### 什么是逃逸分析？栈上分配？
+
+逃逸分析（`Escape Analysis`）简单来讲就是，Java Hotspot **虚拟机通过分析新创建对象的使用范围，并决定是否在 Java 堆上分配内存的一项技术**。
+
+逃逸分析的 JVM 参数如下：
+
+- 开启逃逸分析：`-XX:+DoEscapeAnalysis`
+- 关闭逃逸分析：`-XX:-DoEscapeAnalysis`
+- 显示分析结果：`-XX:+PrintEscapeAnalysis`
+
+逃逸分析技术在 Java SE 6u23+ 开始支持，并默认设置为启用状态，可以不用额外加这个参数。
+
+针对上面第三点，当一个对象没有逃逸时，可以得到以下几个虚拟机的优化。
+
+#### 锁消除
+
+我们知道线程同步锁是非常牺牲性能的，当编译器确定当前对象只有当前线程使用，那么就会移除该对象的同步锁。
+
+例如，StringBuffer 和 Vector 都是用 synchronized 修饰线程安全的，但大部分情况下，它们都只是在当前线程中用到，这样编译器就会优化移除掉这些锁操作。
+
+锁消除的 JVM 参数如下：
+
+- 开启锁消除：`-XX:+EliminateLocks`
+- 关闭锁消除：`-XX:-EliminateLocks`
+
+锁消除在 JDK8 中都是默认开启的，并且锁消除都要建立在**逃逸分析**的基础上。
+
+#### 标量替换
+
+首先要明白`标量`和`聚合量`，**基础类型和对象的引用可以理解为标量，它们不能被进一步分解。而能被进一步分解的量就是聚合量**，比如：对象。
+
+对象是聚合量，它又可以被进一步分解成标量，将其成员变量分解为分散的变量，这就叫做`标量替换`。
+
+这样，如果一个对象没有发生逃逸，那压根就不用创建它，只会在栈或者寄存器上创建它用到的成员标量，节省了内存空间，也提升了应用程序性能。
+
+标量替换的 JVM 参数如下：
+
+- 开启标量替换：`-XX:+EliminateAllocations`
+- 关闭标量替换：`-XX:-EliminateAllocations`
+- 显示标量替换详情：`-XX:+PrintEliminateAllocations`
+
+标量替换同样在 JDK8 中都是默认开启的，并且都要建立在逃逸分析的基础上。
+
+#### 栈上分配
+
+当对象没有发生逃逸时，该对象就可以通过标量替换分解成成员标量分配在栈内存中，和方法的生命周期一致，随着栈帧出栈时销毁，减少了 GC 压力，提高了应用程序性能。
+
+
+
+
+
+### 什么是 TLAB ?
+
+TLAB（Thread Local Allocation Buffer）是虚拟机在堆内存的Eden划分出来的一块专用空间线程专属。在虚拟机的TLAB功能启动的情况下，在线程初始化时，虚拟机会为每个线程分配一块TLAB空间，只给当前线程使用，这样每个线程都单独拥有一个空间，如需要分配内存，在自己的空间上分配，在不存在竞争的情况大大提升分配效率。
+
+
+
+### 为什么会有TLAB?
+
+TLAB的存在可以提高Java程序的并发性能和对象分配的效率，降低垃圾回收的负担，从而提高整个程序的性能：
+
+1. `减少线程之间的竞争`：在没有TLAB的情况下，所有线程都需要竞争堆内存中的空闲空间进行对象分配，这会增加线程之间的竞争，影响程序的并发性能。有了TLAB，每个线程都有自己的内存区域进行对象分配，可以避免线程之间的竞争。
+2. `减少垃圾回收的负担`：在没有TLAB的情况下，每次对象分配都会增加垃圾回收的负担。因为垃圾回收器需要遍历整个堆内存才能找到不再被使用的对象进行回收。有了TLAB，对象分配发生在线程私有的内存区域中，不需要遍历整个堆内存，从而减少了垃圾回收的负担。
+3. `提高对象分配的效率`：由于TLAB是线程私有的，所以对象分配可以在TLAB中进行，不需要对整个堆内存进行扫描和分配，可以减少内存分配时的锁竞争和系统调用等操作，从而提高对象分配的效率。
+
+
+
+### JVM中对象在堆中的生命周期?
+
+1. 在 JVM 内存模型的堆中，堆被划分为新生代和老年代 
+   - 新生代又被进一步划分为 **Eden区** 和 **Survivor区**，Survivor 区由 **From Survivor** 和 **To Survivor** 组成
+2. 当创建一个对象时，对象会被优先分配到新生代的 Eden 区 
+   - 此时 JVM 会给对象定义一个**对象年轻计数器**（`-XX:MaxTenuringThreshold`）
+3. 当 Eden 空间不足时，JVM 将执行新生代的垃圾回收（Minor GC） 
+   - JVM 会把存活的对象转移到 Survivor 中，并且对象年龄 +1
+   - 对象在 Survivor 中同样也会经历 Minor GC，每经历一次 Minor GC，对象年龄都会+1
+4. 如果分配的对象超过了`-XX:PetenureSizeThreshold`，对象会**直接被分配到老年代**
+
+
+
+### **什么是方法区？**
+
+方法区（Method Area）用来**存储已被Java虚拟机加载的类信息、常量、静态变量、即时编译器编译后的代码等数据**。
+
+方法区也称为“永久代”，这是因为垃圾回收器对方法区的垃圾回收比较少，主要是针对常量池的回收以及对类型的卸载，回收条件比较苛刻。经常会导致对此内存未完全回收而导致内存泄露，最后当方法区无法满足内存分配时，将抛出 OutOfMemoryError 异常。
+
+在JDK1.8 的 HotSpot 虚拟机中，已经去掉了方法区的概念，用 `Metaspace` 代替，并且将其移到了本地内存来规划了。
+
+
+
+### **什么是运行时常量池？**
+
+在Java虚拟机规范中，运行时常量池（Runtime Constant Pool）用于存放编译期生成的各种字面量和符号引用，是**方法区**的一部分。但是Java虚拟机规范对其没有做任何细节的要求，所以不同虚拟机实现商可以按照自己的需求来实现该区域，比如在 **HotSpot** 虚拟机实现中，就将运行时常量池移到了堆中。
+
+**①、存放字 面量、符号引用、直接引用**
+
+通常来说，该区域除了保存Class文件中描述的引用外，还会把翻译出来的直接引用也存储在运行时常量池，并且Java语言并不要求常量一定只能在编译器产生，运行期间也可能将常量放入池中，比如String类的intern()方法，**当调用intern方法时，如果池中已经包含一个与该`String`确定的字符串相同`equals(Object)`的字符串，则返回该字符串。否则，将此String对象添加到池中，并返回此对象的引用。**。
+
+**②、抛出 OutOfMemoryError 异常**
+
+运行时常量池是方法区的一部分，会受到方法区内存的限制，当常量池无法申请到内存时，会抛出该异常。
+
+
+
+### 什么是直接内存？
+
+直接内存（Direct Memory）并不是虚拟机运行时数据区的一部分，它也不是Java虚拟机规范定义的内存区域。我们可以看到在 HotSpot 中，就将方法区移除了，用元数据区来代替，并且将元数据区从虚拟机运行时数据区移除了，转到了本地内存中，也就是说这块区域是受本机物理内存的限制，当申请的内存超过了本机物理内存，才会抛出 OutOfMemoryError 异常。
+
+直接内存也是受本机物理内存的限制，在JDK1.4中新加入的 NIO（new input/output）类，引入了一种基于通道（Channel）与缓冲区（Buffer）的 I/O 方式，它可以使用 Native 函数库直接分配堆外内存，然后通过一个存储在Java堆里面的 DirectByteBuffer 对象作为这块内存的引用操作，这样避免了在Java堆和Native堆中来回复制数据，显著提高性能。
+
+
+
+### Java对象在内存中的存储布局
+
+在HotSpot虚拟机中对象在内存中的存储布局可以分为：**对象头、实例数据和对齐填**充3部分。
+
+<img src="http://image.easyblog.top/159427348170717f20231-8e84-46f2-8ae5-b4fed58c5c9f.png" alt="img" />
+
+#### **对象头（Object Header）**
+
+对象头在HotSpot虚拟机中被分为了两部分，**一部分官方称为Mark Word;另一部分是类型指针**。如果对象是一个Java数组，那在对象头中还有一块用于记录数组长度的数据。
+
+<img src="http://image.easyblog.top/15822769154174f52765f-4a90-4384-aed8-2f530eb98f2b.png" alt="img" style="zoom:80%;" />
+
+* 第一部分**Mark Word用于存储对象自身的运行时数据**，如哈希码（HashCode）、GC 分代年龄、锁状态标志、线程持有的锁、偏向线程 ID、对象分代年龄等信息。
+* 第二部分是**类型指针，即对象指向它的类元数据的指针，虚拟机通过这个指针来确定这个对象是哪个类的实例**。在不开启类指针压缩（`-XX:+UseCompressedClassPointers`）的情况下是8字节。压缩后变为4字节，默认压缩。 通过命令：`java -XX:+PrintCommandLineFlags -version` 查看classPointer是否开启压缩
+
+#### **实例数据（Instance Data）**
+
+ 实例数据部分是对象真正存储的有效信息，也是在程序代码中所定义的各种类型的字段内容。     这部分的存储顺序会受到虚拟机分配策略参数（FieldsAllocationStyle）和字段在 Java 源码中定义顺序的影响。
+
+#### **对齐填充**
+
+由于HotSpot VM的自动内存管理系统要求对象的起始地址必须是8字节的整数倍，即：Java对象的大小必须是8字节的整数倍，而对象头的大小正好是8字节的整数倍，所以当对象的实例数据没有对齐的时候，就需要对齐填充来补全。因此对齐填充并不是必须存在的，也没有特殊的含义，它仅仅起到了占位符的作用。
+
+
+
+### 一个Object对象占用多少个字节内存?
+
+会占用16个字节。比如`Object obj = new Object();`
+
+因为obj引用占用栈的4个字节，new出来的对象占用堆中的8个字节，4+8=12，但是对象要求都是8的倍数，所以对象的字节对齐（Padding）部分会补齐4个字节，也就是占用16个 字节。
+
+再比如：
+
+```java
+public class NewObj {
+    int count;
+    boolean flag;
+    Object obj;
+}
+NewObj obj = new NewObj();
+```
+
+这个对象大小为：对象头8字节+int类型4字节+boolean类型1字节+对象的引用4字节=17字节，需要8的倍数，所以字节对齐需要补充7个字节，也就是这段程序占用24字节。
+
+## 5.3 GC垃圾回收
+
+### 对象怎么定位
+
+目前主流的对象访问方式有使用**句柄** 和 **直接指针**两种方式。
+
+**（1）句柄访问**     
+
+在Java堆内存中划分一块内存专门用来作为句柄池，JVM桟的局部变量表的reference存储对象的句柄地址，而句柄中保存了对象实例数据与类型数据的具体地址，如下图所示：
+
+<img src="http://image.easyblog.top/1582280468345e2700388-2407-422f-8c39-d74306d2a90e.jpg" alt="enter image description here" />
+
+使用句柄方式最大的好处就是reference中存储的是稳定的句柄地址，在对象被移动（垃圾收集时移动对象是非常普遍的行为）时只会改变句柄中的实例数据指针，而reference本身不需要被修改。
+
+**（2）直接指针访问**
+
+​    此时reference直接存储对象在堆中的地址，不再需要句柄池，这样做最大的好处是提高了性能，因为它节省了一次指针定位的时间开销。然而这也是HotSpot VM所选择的对象访问方式。
+
+<img src="http://image.easyblog.top/1582280393660ad3239df-e018-4404-8174-319e5ceb4e47.jpg" alt="直接指针访问" />
+
+
+
+### 如何判断对象是否能被回收？
+
+#### **引用计数算法**
+
+这种算法是这样的：给每一个创建的对象增加一个引用计数器，每当有一个地方引用它时，这个计数器就加1；而当引用失效时，这个计数器就减1。当这个引用计数器值为0时，也就是说这个对象没有任何地方在使用它了，那么这就是一个无效的对象，便可以进行垃圾回收了。这种算法实现简单，而且效率也很高。但是**Java没有采用该算法来进行垃圾回收**，因为这种算法无法解决对象之间的循环引用问题。
+
+#### 可达性分析法
+
+这里直接给出结论：**在主流的商用程序中（Java，C#），都是使用根搜索算法（GC Roots Tracing）来判定对象是否存活。** 
+
+该算法思路：通过一系列名为“GC Roots” 的对象作为终点，当一个对象到GC Roots 之间无法通过引用到达时，那么该对象便可以进行回收了。
+
+<img src="http://image.easyblog.top/1582340634188cbd9a85a-2a5a-48ef-acf6-bca177d9caad.jpg" alt="img" />
+
+如上图所示，GC Roots到Object1、Object2、Object3、Object4都是可达的（可达意为GC Roots沿着某条路径（引用链）一定可以找到该对象），但是GC Roots到Object5、Object6、Object7没有可达的引用链，因此它们将会被判断为可回收的对象。
+
+- 优点：更加精确和严谨，可以分析出循环数据结构相互引用的情况；
+- 缺点：实现比较复杂、需要分析大量数据，消耗大量时间、分析过程需要GC停顿（引用关系不能发生变化），即停顿所有Java执行线程（称为"Stop The World"，是垃圾回收重点关注的问题）。
+
+在Java语言中可以作为GC Roots的对象有以下几种：
+
+（1）**虚拟机桟桟帧中的局部变量表所引用的对象。** 
+
+（2）**方法区中类的静态的属性所引用的对象**。 
+
+（3）**方法区中常量引用的对象**。 
+
+（4）**本地方法桟中本地方法所引用的对象**。
+
+
+
+### finalize方法回收对象两次标记过程
+
+**当一个对象被GC Roots标记为不可用之后，要宣告一个对象的死亡还要至少经过两次标记**：
+
+（1）当一个对象通过可达性分析发现CG Roots与他不可达，那他会被第一次标记并且进行第一次筛选，筛选的条件是此对象的finalize()方法是否有必要执行。当对象的finalize方法没有重写或已经被执行过了，那么将不会再执行，那么此对象就会立即被宣告死亡。
+
+（2）如果这个对象有必要执行 finalize() 方法，那么该**对象将会被放置在一个由虚拟机自动建立、低优先级，名为 F-Queue 队列中，GC会对F-Queue进行第二次标记**，如果对象在finalize() 方法中成功拯救了自己（比如重新与GC Roots建立连接），那么第二次标记时，就会将该对象移除即将回收的集合，否则就会被回收。
+
+
+
+### 对象的引用类型有哪几种，分别介绍下？
+
+#### **强引用**
+
+类似`Object obj=new Object()`这样的引用方式就是强引用，**只有所有的GC Roots对象都不通过强引用引用该对象的时候，该对象才能被垃圾回收**。日常开发中，使用最多的可能就是强引用了吧！
+
+#### **软引用**
+
+对于只有软引用的对象而言，当系统内存空间足够时，它不会被系统回收；如果内存空间不足了，就会被回收。软引用可以使用`SoftReference<V>`类来实现并且可以配合引用队列来释放软引用自身
+
+使用场景：软引用可以用于存放一些重要性不是很强又不能随便让清除的对象，比如图片编辑器、视屏编辑器、缓存等
+
+#### **弱引用**
+
+对于只有弱引用的对象而言，当系统垃圾回收机制运行时，不管系统内存是否足够，该对象所占用的内存一定会被回收。在不需要的时候，让JVM自动帮我们处理掉它们。弱引用可以使用`WeakReference<V>`类来实现。同理可以配合引用队列来释放弱引用自身
+
+使用场景：ThreadLocal中的ThreadLocalMap中的key和ThreadLocal对象之间就是弱引用；WeakHashMap类中的key
+
+#### **虚引用**
+
+如果一个对象只有一个虚引用时，那么它和没有引用的效果大致相同。
+
+使用场景：用于对象销毁前的一些操作，比如说资源释放等
+
+
+
+### 垃圾收集算法有哪些？
+
+垃圾回收涉及到大量的程序细节，而且各个平台的虚拟机操作内存的方式也不一样，但是他们进行垃圾回收的算法是通用的，所以这里我们也只介绍几种通用算法。
+
+#### 标记-清除算法
+
+<img src="https://img2018.cnblogs.com/blog/1120165/201907/1120165-20190701213406016-286379646.png" alt="img" style="zoom:60%;" />
+
+**算法实现**：分为标记-清除两个阶段，首先根据上面的根搜索算法标记出所有需要回收的对象，在标记完成后，然后在统一回收掉所有被标记的对象。
+
+**缺点**：
+
+* 1、`效率低`：标记和清除这两个过程的效率都不高。
+
+* 2、`容易产生内存碎片`：因为内存的申请通常不是连续的，那么清除一些对象后，那么就会产生大量不连续的内存碎片，而碎片太多时，当有个大对象需要分配内存时，便会造成没有足够的连续内存分配而提前触发垃圾回收，甚至直接抛出OutOfMemoryExecption。
+
+
+
+#### 复制算法
+
+为了解决标记-清除算法的两个缺点，复制算法诞生了。
+
+<img src="https://img2018.cnblogs.com/blog/1120165/201907/1120165-20190701215336656-48891683.png" alt="img" style="zoom:60%;" />
+
+**算法实现**：将可用内存按容量划分为大小相等的两块区域，每次只使用其中一块，当这一块的内存用完了，就将还活着的对象复制到另一块区域上，然后再把已使用过的内存空间一次性清理掉。
+
+**优点**：每次都是只对其中一块内存进行回收，不用考虑内存碎片的问题，而且分配内存时，只需要移动堆顶指针，按顺序进行分配即可，简单高效。
+
+**缺点**：将内存分为两块，但是每次只能使用一块，也就是说，机器的一半内存是闲置的，这资源浪费有点严重。并且如果对象存活率较高，每次都需要复制大量的对象，效率也会变得很低。
+
+
+
+#### 标记-整理算法
+
+上面我们说到复制算法的缺点——会浪费一半的内存，并且对象存活率较高时，会有过多的复制操作，效率低下。
+
+如果对象存活率很高，基本上不会进行垃圾回收时，标记-整理算法诞生了。
+
+<img src="https://img2018.cnblogs.com/blog/1120165/201907/1120165-20190701215456537-787486222.png" alt="img" style="zoom:50%;" />
+
+**算法实现**：首先标记出所有存活的对象，然后让所有存活对象向一端进行移动，最后直接清理到端边界以外的内存。
+
+**局限性**：只有对象存活率很高的情况下，使用该算法才会效率较高。
+
+
+
+### 分代收集是怎么工作的？
+
+以上三种垃圾回收算法是JVM垃圾回收器最常使用的三种算法模型，基于这些算法，JVM中有一个**分代回收模型**。
+
+模型实现：根据对象的存活周期不同将内存分为几块，然后不同的区域采用不同的回收算法。
+
+1、对于存活周期较短，每次都有大批对象死亡，只有少量存活的区域，采用复制算法，因为只需要付出少量存活对象的复制成本即可完成收集；
+
+2、对于存活周期较长，没有额外空间进行分配担保的区域，采用标记-整理算法，或者标记-清除算法。
+
+比如，对于 HotSpot 虚拟机，它将堆空间分为如下两块区域：
+
+<img src="http://image.easyblog.top/1581945296692366e8ad8-8995-4e99-9631-e5e9e10b617b.png" alt="img" style="zoom:80%;" />
+
+堆有新生代和老年代两块区域组成，而新生代区域又分为三个部分，分别是 Eden,From Surivor,To Survivor ,比例是8:1:1。
+
+新生代一般采用复制算法，每次使用一块Eden区和一块Survivor区，当进行垃圾回收时，将Eden和一块Survivor区域的所有存活对象复制到另一块Survivor区域，然后清理到刚存放对象的区域，依次循环。
+
+老年代一般采用标记-清除或者标记-整理算法，根据使用的垃圾回收器来进行判断。
+
+至于为什么要这样，这是由于内存分配的机制导致的，**新生代存的基本上都是朝生夕死的对象，而老年代存放的都是存活率很高的对象**。
+
+
+
+### Java垃圾回收器有哪些？
+
+<img src="http://image.easyblog.top/1594299535371015eb6ac-5b51-4881-ad53-3a8d983adb26.jpeg" alt="深入理解JVM—垃圾回收器（Grabage Collector）进阶篇" style="zoom:50%;" />
+
+1. **Serial 收集器**
+
+![image](https://pdai.tech/images/pics/22fda4ae-4dd5-489d-ab10-9ebfdad22ae0.jpg)
+
+Serial 是单线程的收集器，只会使用一个线程进行垃圾收集工作。
+
+它的优点是简单高效，对于单个 CPU 环境来说，由于没有线程交互的开销，因此拥有最高的单线程收集效率。
+
+它是 Client 模式下的默认新生代收集器，因为在用户的桌面应用场景下，分配给虚拟机管理的内存一般来说不会很大。Serial 收集器收集几十兆甚至一两百兆的新生代停顿时间可以控制在一百多毫秒以内，只要不是太频繁，这点停顿是可以接受的。
+
+
+
+2. **ParNew 收集器**
+
+![image](https://pdai.tech/images/pics/81538cd5-1bcf-4e31-86e5-e198df1e013b.jpg)
+
+它是 Serial 收集器的多线程版本。
+
+是 Server 模式下的虚拟机首选新生代收集器，除了性能原因外，主要是因为除了 Serial 收集器，只有它能与 CMS 收集器配合工作。
+
+默认开启的线程数量与 CPU 数量相同，可以使用 -XX:ParallelGCThreads 参数来设置线程数。
+
+
+
+3. **Parallel Scavenge 收集器**
+
+与 ParNew 一样是多线程收集器。
+
+其它收集器关注点是尽可能缩短垃圾收集时用户线程的停顿时间，而它的目标是达到一个可控制的吞吐量，它被称为“吞吐量优先”收集器。这里的吞吐量指 CPU 用于运行用户代码的时间占总时间的比值。
+
+停顿时间越短就越适合需要与用户交互的程序，良好的响应速度能提升用户体验。而高吞吐量则可以高效率地利用 CPU 时间，尽快完成程序的运算任务，主要适合在后台运算而不需要太多交互的任务。
+
+缩短停顿时间是以牺牲吞吐量和新生代空间来换取的: 新生代空间变小，垃圾回收变得频繁，导致吞吐量下降。
+
+可以通过一个开关参数打开 GC 自适应的调节策略(GC Ergonomics)，就不需要手动指定新生代的大小(-Xmn)、Eden 和 Survivor 区的比例、晋升老年代对象年龄等细节参数了。虚拟机会根据当前系统的运行情况收集性能监控信息，动态调整这些参数以提供最合适的停顿时间或者最大的吞吐量。
+
+
+
+4. **Serial Old 收集器**
+
+![image](https://pdai.tech/images/pics/08f32fd3-f736-4a67-81ca-295b2a7972f2.jpg)
+
+Serial Old 是 Serial 收集器的老年代版本，也是给 Client 模式下的虚拟机使用。如果用在 Server 模式下，它有两大用途:
+
+- 在 JDK 1.5 以及之前版本(Parallel Old 诞生以前)中与 Parallel Scavenge 收集器搭配使用。
+- 作为 CMS 收集器的后备预案，在并发收集发生 Concurrent Mode Failure 时使用。
+
+
+
+5. **Parallel Old 收集器**
+
+![image](https://pdai.tech/images/pics/278fe431-af88-4a95-a895-9c3b80117de3.jpg)
+
+Parallel Old 是 Parallel Scavenge 收集器的老年代版本。
+
+在注重吞吐量以及 CPU 资源敏感的场合，都可以优先考虑 Parallel Scavenge 加 Parallel Old 收集器。
+
+
+
+6. **CMS 收集器**
+
+![image](https://pdai.tech/images/pics/62e77997-6957-4b68-8d12-bfd609bb2c68.jpg)
+
+`CMS(Concurrent Mark Sweep)`，Mark Sweep 指的是标记 - 清除算法。
+
+分为以下四个流程:
+
+- 初始标记: 仅仅只是标记一下 GC Roots 能直接关联到的对象，速度很快，需要停顿。
+- 并发标记: 进行 GC Roots Tracing 的过程，它在整个回收过程中耗时最长，不需要停顿。
+- 重新标记: 为了修正并发标记期间因用户程序继续运作而导致标记产生变动的那一部分对象的标记记录，需要停顿。
+- 并发清除: 不需要停顿。
+
+在整个过程中耗时最长的并发标记和并发清除过程中，收集器线程都可以与用户线程一起工作，不需要进行停顿。
+
+具有以下缺点:
+
+- 吞吐量低: 低停顿时间是以牺牲吞吐量为代价的，导致 CPU 利用率不够高。
+- 无法处理浮动垃圾，可能出现 Concurrent Mode Failure。浮动垃圾是指并发清除阶段由于用户线程继续运行而产生的垃圾，这部分垃圾只能到下一次 GC 时才能进行回收。由于浮动垃圾的存在，因此需要预留出一部分内存，意味着 CMS 收集不能像其它收集器那样等待老年代快满的时候再回收。如果预留的内存不够存放浮动垃圾，就会出现 Concurrent Mode Failure，这时虚拟机将临时启用 Serial Old 来替代 CMS。
+- 标记 - 清除算法导致的空间碎片，往往出现老年代空间剩余，但无法找到足够大连续空间来分配当前对象，不得不提前触发一次 Full GC。
+
+
+
+7. **G1 收集器**
+
+`G1(Garbage-First)`，它是一款面向服务端应用的垃圾收集器，在多 CPU 和大内存的场景下有很好的性能。HotSpot 开发团队赋予它的使命是未来可以替换掉 CMS 收集器。
+
+堆被分为新生代和老年代，其它收集器进行收集的范围都是整个新生代或者老年代，而 **G1 可以直接对新生代和老年代一起回收**。
+
+G1 把堆划分成多个大小相等的独立区域(Region)，新生代和老年代不再物理隔离。
+
+![image](https://pdai.tech/images/pics/9bbddeeb-e939-41f0-8e8e-2b1a0aa7e0a7.png)
+
+**通过引入 Region 的概念，从而将原来的一整块内存空间划分成多个的小空间，使得每个小空间可以单独进行垃圾回收**。这种划分方法带来了很大的灵活性，使得可预测的停顿时间模型成为可能。通过记录每个 Region 垃圾回收时间以及回收所获得的空间(这两个值是通过过去回收的经验获得)，并维护一个优先列表，每次根据允许的收集时间，优先回收价值最大的 Region。
+
+每个 Region 都有一个 `Remembered Set`，用来记录该 Region 对象的引用对象所在的 Region。通过使用 Remembered Set，在做可达性分析的时候就可以避免全堆扫描。
+
+![image](https://pdai.tech/images/pics/f99ee771-c56f-47fb-9148-c0036695b5fe.jpg)
+
+如果不计算维护 Remembered Set 的操作，G1 收集器的运作大致可划分为以下几个步骤:
+
+- 初始标记
+- 并发标记
+- 最终标记: 为了修正在并发标记期间因用户程序继续运作而导致标记产生变动的那一部分标记记录，虚拟机将这段时间对象变化记录在线程的 `Remembered Set Logs` 里面，最终标记阶段需要把 Remembered Set Logs 的数据合并到 Remembered Set 中。这阶段需要停顿线程，但是可并行执行。
+- 筛选回收: 首先对各个 Region 中的回收价值和成本进行排序，根据用户所期望的 GC 停顿时间来制定回收计划。此阶段其实也可以做到与用户程序一起并发执行，但是因为只回收一部分 Region，时间是用户可控制的，而且停顿用户线程将大幅度提高收集效率。
+
+具备如下特点:
+
+- 空间整合: 整体来看是基于“标记 - 整理”算法实现的收集器，从局部(两个 Region 之间)上来看是基于“复制”算法实现的，这意味着运行期间不会产生内存空间碎片。
+- 可预测的停顿: 能让使用者明确指定在一个长度为 M 毫秒的时间片段内，消耗在 GC 上的时间不得超过 N 毫秒。
+
+
+
+8. **ZGC 收集器**
+
+`ZGC（Z Garbage Collector）`是一种由Oracle公司开发的低延迟、可扩展、并发的垃圾回收器。它可以在几毫秒内完成垃圾回收操作，并且可以扩展到非常大的堆大小，适用于需要更快响应时间和更大堆大小的服务器应用程序。
+
+ZGC的主要特点如下：
+
+1. 低延迟：ZGC的最大特点是可以在非常短的时间内完成垃圾回收操作，最大的停顿时间通常不超过10ms，即使在非常大的堆大小下也可以保持较低的停顿时间。
+2. 可扩展：ZGC可以支持非常大的堆大小，最大可以支持数TB的堆大小。它也支持动态调整堆大小和线程数量，以适应不同的应用程序需求。
+3. 并发：ZGC可以在多个CPU核心上并发执行垃圾回收操作，并且可以与应用程序并发执行。这意味着在执行垃圾回收时不会暂停所有的用户线程，因此可以保证应用程序的响应时间。
+4. 可靠性：ZGC具有强大的内存管理能力，可以有效地处理各种内存管理问题，例如内存泄漏、堆内碎片等。
+
+
+
+ZGC采用了以下几种技术来实现低延迟和高吞吐量的垃圾回收：
+
+1. **并发压缩**：ZGC采用了一种名为“并发压缩”的技术来执行垃圾回收操作。它会将垃圾对象标记为“死亡”状态，并将它们从堆中删除。同时，它会在后台执行压缩操作，将存活对象移动到连续的内存区域，从而减少堆内碎片。
+2. **内存染色**：ZGC采用了一种名为“内存染色”的技术来识别可回收的内存区域。它会使用一组内存标记来标记每个内存区域的状态，从而能够快速地识别可回收的内存区域。
+3. **并发执行**：ZGC采用了一种名为“并发执行”的技术来在多个CPU核心上并发执行垃圾回收操作。这样可以保证在执行垃圾回收时不会暂停所有的用户线程，从而能够提高应用程序的响应时间。
+
+
+
+### 详细介绍一下CMS收集器？
+
+CMS全称叫`Concurrent Mark Sweep`，从名字就能看出来这是一个并发收集并且采用`标记-清除`算法的垃圾收集器。一种以获取最短回收停顿时间为目标的**老年代收集器**
+
+CMS 收集器的内存回收过程是与用户线程一起并发执行的，可以搭配 `ParNew 收集器`（多线程，新生代，复制算法）与 `Serial Old 收集器`（单线程，老年代，标记-整理算法）使用。
+
+CMS的工作流程分为：`初始标记`、`并发标记`、`重新标记`、`并发清除`四个阶段
+
+![](https://pdai.tech/images/pics/62e77997-6957-4b68-8d12-bfd609bb2c68.jpg)
+
+#### **初始标记(有STW)**
+
+只标记` GC Roots` ，所以速度很快，但是仍存在 `Stop The World `问题。
+
+#### **并发标记**
+
+进行 `GC Roots Tracing `的过程，也就是从`GC ROOT`开始进行可达性分析，找出并标记`存活对象`，此时是和用户线程并发执行的，不会`STW`。
+
+#### **重新标记(有STW)**
+
+因为并发标记是和用户线程并发执行的，在并发标记的过程中用户线程有可能又会新产生垃圾，或者已经被标记为垃圾的对象又重新被引用。所以需要修正并发标记期间因用户程序继续运行而导致标记产生变动的那一部分对象的标记记录，此过程存在STW
+
+需要注意的是，重新标记过程中不会从`GC ROOT`开始去重新扫描，而是将并发标记过程中用户线程新产生的垃圾进行标记。
+
+#### **并发清除**
+
+此阶段对`垃圾对象`进行清除回收。由于此时是和用户线程并发运行，所以在清除的过程中，可能仍然会有新的垃圾产生，这些垃圾就叫`[浮动垃圾]`。针对于这种情况，在并发清理时产生的垃圾，会放到下一轮垃圾回收的时候被回收。
+
+如果当用户需要存入一个很大的对象时，新生代放不下去，老年代由于浮动垃圾过多，就会退化为 Serial Old 收集器，将老年代垃圾进行标记-整理，当然这也是很耗费时间的！
+
+
+
+#### CMS收集器的缺点
+
+1. **内存碎片问题**：由于 CMS 采用的是标记-清除算法，这意味着在垃圾回收过程中会产生大量的内存碎片，从而使得堆内存变得不连续，可能会导致频繁的Full GC操作。当剩余内存不能满足程序运行要求时，系统将会出现 `Concurrent Mode Failure`， CMS 会退回 Serial Old 回收器进行垃圾清除，此时的性能将会被降低。
+2. **remark阶段停顿时间会很长的问题**：CMS回收垃圾的四个阶段中，最花费时间的一个阶段是重新标记阶段，而且此过程需要停止应用程序线程，如果堆大小非常大，这个停顿时间可能会非常长。
+3. **浮动垃圾**：在并发清除的过程中，在标记阶段有些对象被GC ROOT引用着，但是在并发清除的时候由于GC线程和用户线程是并发执行的，所以这些对象没有被GC ROOT引用了。那么这些对象就变成了垃圾（`也就是浮动垃圾`）。由于在标记阶段这些对象已经被认为不是垃圾了。所以垃圾收集器在这次无法清理这些对象。这些垃圾会在下一个周期被回收；
+4. **concurrent mode failure**：执行CMS GC的过程中，同时业务线程也在运行，当年轻带空间满了，执行`YGC`时，需要将存活的对象放入到老年代，而此时老年代空间不足，这时CMS还没有机会回收老年带产生的，或者在做Minor GC的时候，新生代救助空间放不下，需要放入老年代，而老年代也放不下而产生的。
+5. **promotion failed**：这个问题是指，在进行Minor GC时，Survivor空间不足，对象只能放入老年代，而此时老年代也放不下造成的，多数是由于老年代有足够的空闲空间，但是由于碎片较多，新生代要转移到老年带的对象比较大,找不到一段连续区域存放这个对象导致的
+
+
+
+#### CMS收集器缺点解决
+
+1. **内存碎片问题：**针对这个问题，我们需要用到这个参数：`-XX:CMSFullGCsBeforeCompaction=n` 意思是说在上一次CMS并发GC执行过后，到底还要再执行多少次`full GC`才会做压缩。默认是0，也就是在默认配置下每次CMS GC顶不住了而要转入full GC的时候都会做压缩。
+
+2. **concurrent mode failure：**解决这个问题其实很简单，只需要设置两个参数即可
+
+   `-XX:+UseCMSInitiatingOccupancyOnly -XX:CMSInitiatingOccupancyFraction=60`：是指设定CMS在对内存占用率达到60%的时候开始GC。
+
+3. **remark阶段停顿时间会很长的问题**：解决只需要加入`-XX:+CMSScavengeBeforeRemark`。在执行remark操作之前先做一次`Young GC`，目的在于减少年轻代对老年代的无效引用，降低remark时的开销。
+
+
+
+### 详细介绍一下G1收集器？
+
+`G1(Garbage-First)`是一个分代的，增量的，并行与并发的`标记-复制`垃圾回收器。它的设计目标是为了适应现在不断扩大的内存和不断增加的处理器数量，进一步降低暂停时间（pause time），同时兼顾良好的吞吐量。G1回收器和CMS比起来，有以下不同：
+
+- G1垃圾回收器是**compacting**的，因此其回收得到的空间是连续的。这避免了CMS回收器因为不连续空间所造成的问题。如需要更大的堆空间，更多的floating garbage。连续空间意味着G1垃圾回收器可以不必采用空闲链表的内存分配方式，而可以直接采用bump-the-pointer的方式；
+- G1回收器的内存与CMS回收器要求的内存模型有极大的不同。G1将内存划分一个个固定大小的region，每个region可以是年轻代、老年代的一个。**内存的回收是以region作为基本单位的**；
+- G1还有一个及其重要的特性：**软实时**（soft real-time）。所谓的实时垃圾回收，是指在要求的时间内完成垃圾回收。“软实时”则是指，用户可以指定垃圾回收时间的限时，G1会努力在这个时限内完成垃圾回收，但是G1并不担保每次都能在这个时限内完成垃圾回收。通过设定一个合理的目标，可以让达到90%以上的垃圾回收时间都在这个时限内。
+
+
+
+#### G1内存模型
+
+##### **分区Region**
+
+G1将堆空间分为一个一个方形区域（Region）。可通过参数`-XX:G1HeapRegionSize`设置单个Region的大小，取值范围`1M-32M`，2的n次幂。默认为堆内存/2048，即一共`2048`个Region。
+
+一段连续的空间，根据需要可扮演不同角色，可以是年轻代的伊甸区（E）、幸存区（S），也可以是老年代（O）。
+除了E、S、O，还有一种代号为H的Region，是以往算法里没有的概念。H代表Humongous，即大对象。当一个对象的大小超过了Region的一半，则视为大对象，如果超过了整个Region的大小，将使用连续N个H Region来存放。虽说Humongous跳出了年轻代和老年代的概念，但G1的大多数行为都把它视为老年代的一部分。
+
+![](http://image.easyblog.top/1680414845636c8d37673-4acd-45b6-a55e-e0b6f8c43908.png)
+
+
+
+##### **卡片Card**
+
+![img](https://pdai.tech/images/java/java-jvm-gc-g1-1.jpeg)
+
+在**每个分区内部又被分成了若干个大小为512 Byte卡片(Card)，这是分配堆内存最小可用粒度**，所有分区的卡片记录在全局卡片表(`Global Card Table`)中，分配的对象会占用物理上连续的若干个卡片，当查找对分区内对象的引用时便可通过记录卡片来查找该引用对象(见RSet)。每次对内存的回收，都是对指定分区的卡片进行处理。
+
+
+
+##### **Remember Set(RSet)**
+
+ 在串行和并行收集器中，GC时是通过整堆扫描来确定对象是否处于可达路径中。然而G1为了避免STW式的整堆扫描，为每个分区各自分配了一个 `RSet（Remembered Set）`，它内部类似于一个反向指针，记录了其它 Region 对当前 Region 的引用情况，这样就带来一个极大的好处：**回收某个Region时，不需要执行全堆扫描，只需扫描它的 RSet 就可以找到外部引用，来确定引用本分区内的对象是否存活，进而确定本分区内的对象存活情况**，而这些引用就是 initial mark 的根之一。
+
+
+
+##### Collection Set(CSet)
+
+![img](https://pdai.tech/images/java/java-jvm-gc-g1-4.jpeg)
+
+收集集合(CSet)代表每次GC暂停时回收的一系列目标分区。在任意一次收集暂停中，CSet所有分区都会被释放，内部存活的对象都会被转移到分配的空闲分区中。因此无论是年轻代收集，还是混合收集，工作的机制都是一致的。年轻代收集CSet只容纳年轻代分区，而混合收集会通过**启发式算法**，在老年代候选回收分区中，筛选出回收收益最高的分区添加到CSet中。
+
+候选老年代分区的CSet准入条件，可以通过活跃度阈值`-XX:G1MixedGCLiveThresholdPercent`(默认85%)进行设置，从而拦截那些回收开销巨大的对象；同时，每次混合收集可以包含候选老年代分区，可根据CSet对堆的总大小占比`-XX:G1OldCSetRegionThresholdPercent`(默认10%)设置数量上限。
+
+由上述可知，G1的收集都是根据CSet进行操作的，年轻代收集与混合收集没有明显的不同，最大的区别在于两种收集的触发条件。
+
+
+
+##### 三色标记法
+
+CMS和G1在并发标记时使用的是同一个算法：三色标记法，三色标记算法是并发收集阶段的重要算法，它是描述追踪式回收器的一种有用的方法，利用它可以推演回收器的正确性。 首先，我们将对象分成三种类型的：
+
+- `黑色`：根对象，或者该对象与它的子对象都被扫描了
+- `灰色`：对象本身被扫描，但还没扫描完该对象中的子对象
+- `白色`：未被扫描对象，扫描完成所有对象之后，最终为白色的为不可达对象，即垃圾对象
+
+
+
+###### 三色标记算法的流程
+
+（1）根对象被置为黑色，子对象被置为灰色
+
+![img](https://img-blog.csdnimg.cn/407e09d645cf4c8e88e8f1bfe99caf35.png)
+
+
+
+（2）继续由灰色遍历，将已扫描了子对象的对象置为黑色。
+
+![img](https://img-blog.csdnimg.cn/6947dea02172413da0fcf4bbcb492902.png)
+
+（3）遍历了所有可达的对象后，所有可达的对象都变成了黑色。不可达的对象即为白色，需要被清理。
+
+![img](https://img-blog.csdnimg.cn/a6dac8a9a04748ba961e4aa886299a2f.png)
+
+###### 三色标记算法的漏标问题
+
+在标记阶段，应用线程也在执行，那么对象的指针就有可能改变。这样的话，我们就会遇到一个问题：对象丢失问题。我们看下面一种情况，当垃圾收集器扫描到下面情况时：
+
+![img](https://img-blog.csdnimg.cn/8f2bd57ef29a4827ac70c085ef4e94ed.png)
+
+这时候应用程序执行了以下操作：
+
+```java
+A.c=C
+B.c=null
+```
+
+这样，对象的状态图变成如下情形：
+
+![img](https://img-blog.csdnimg.cn/3bcf6a14bba24bf688bd37bd8000d63d.png)
+
+此时C是白色，被认为是垃圾需要清理掉，显然这是不合理的。CMS 和 G1 都存在这样的问题，而 CMS 和 G1 的两种对这个问题页有两种不同实现方式：
+
+* （1）CMS采用的是**增量更新**（`incremental update`）：关注引用的增加，只要在写屏障里发现要有一个白对象的引用被赋值到一个黑对象的字段里，那就把这个白对象变成灰色的，即插入的时候记录下来。
+* （2）G1 使用的是 **STAB**（`snapshot-at-the-beginning`）的方式：关注引用的删除，当灰–>白引用消失时，要把这个引用推到GC的堆栈，保证白还能被GC扫描到。
+
+
+
+> **为什么G1采用SATB而不用incremental update**？
+>
+> 因为采用incremental update把黑色重新标记为灰色后，之前扫描过的还要再扫描一遍，效率太低。G1有RSet与SATB相配合。Card Table里记录了RSet，RSet里记录了其他对象指向自己的引用，这样就不需要再扫描其他区域，只要扫描RSet就可以了。
+>
+> 也就是说 灰色–>白色 引用消失时，如果没有 黑色–>白色，引用会被push到堆栈，下次扫描时拿到这个引用，由于有RSet的存在，不需要扫描整个堆去查找指向白色的引用，效率比较高。SATB配合RSet浑然天成。
+
+
+
+
+
+#### GC模式
+
+G1的GC模式有`Young GC`、`Mixed GC`、`Full GC`。
+
+##### Young GC
+
+除了大对象在H Region分配空间，一般对象都在E Region分配。当所有E Region被耗尽，触发一次Young GC，执行完后，活跃对象会被复制到S Region或晋升到O Region，空闲的E Region加入空闲列表。
+![](http://image.easyblog.top/16804205350906875c5aa-344f-4319-8598-e5c226fe7c36.png)
+
+##### Mixed GC
+
+![](http://image.easyblog.top/1680420668877f6d6fbb1-2e6f-40a3-ba1e-2c424164b75b.png)
+
+G1可以回收堆空间的任何部分，组成回收集（Collection Set、CSet）来回收，衡量标准不再是属于哪个分代，而是哪块内存中垃圾数量最多，回收收益最大，这就是Mixed GC。
+Mixed GC回收所有E Region、S Region和部分的O Region及H Region。
+可通过参数`-XX:InitiatingHeapOccupancyPercent`设置阈值，当O Region占整个堆空间百分比达到此阈值，触发一次Mixed GC，包括以下几步：
+
+![image](https://pdai.tech/images/pics/f99ee771-c56f-47fb-9148-c0036695b5fe.jpg)
+
+* `初始标记（Initial Mark）`：标记出所有 GC Roots 节点以及直接可达的对象，这一阶段需STW，但是耗时很短。
+* `并发标记（Concurrent Mark）`：采用三色标记法，标记整个堆空间的可访问的对象。此阶段不会STW，与应程序同时运行。此阶段时间长，约占整个Mixed GC的80%
+* `最终标记（Remark）`：重新标记阶段是为了修正在并发标记期间，因应用程序继续运作而导致标记产生变动的那一部分标记记录，就是去处理剩下的 SATB日志缓冲区和所有更新，找出所有未被访问的存活对象。
+* `垃圾清除（Cleanup）`：该阶段主要是排序各个 Region 的回收价值和成本，并根据用户所期望的GC停顿时间来制定回收计划。此阶段会STW。需要注意的是这个阶段并不会实际去做垃圾的回收，也不会执行存活对象的拷贝，清除阶段执行的详细操作有以下几点：
+  * **RSet梳理**：启发式算法会根据活跃度和RSet尺寸对分区定义不同等级，同时RSet梳理也有助于发现无用的引用。
+  * **整理堆分区**：为混合收集识别回收收益高（基于释放空间和暂停目标）的老年代分区集合；
+  * **识别所有空闲分区**：即发现无存活对象的分区，该分区可在清除阶段直接回收，无需等待下次收集周期。
+
+
+
+##### Full GC
+
+当 G1 无法在堆空间中申请新的分区时，G1便会触发**担保机制**，执行一次STW式的、单线程的 Full GC，Full GC会对整堆做**标记清除和压缩**，最后将只包含纯粹的存活对象。
+
+使用参数`-XX:G1ReservePercent`可以设置保留空间来应对晋升模式下的异常情况，默认值10%，最大占用整堆50%，更大也无意义。
+
+G1在以下场景中会触发 Full GC，同时会在日志中记录to-space-exhausted以及Evacuation Failure：
+
+* （1）从年轻代分区拷贝存活对象时，无法找到可用的空闲分区
+* （2）从老年代分区转移存活对象时，无法找到可用的空闲分区
+* （3）分配巨型对象时在老年代无法找到足够的连续分区
+
+
+
+
+
+##### **G1 垃圾回收流程小结**
+
+**Young CG 和 Mixed GC，是G1回收空间的主要活动。当应用开始运行时，堆内存可用空间还比较大，只会在年轻代满时，触发年轻代收集；随着老年代内存增长，当到达 IHOP 阈值 -XX:InitiatingHeapOccupancyPercent(老年代占整堆比，默认45%) 时，G1开始着手准备收集老年代空间。首先经历并发标记周期，识别出高收益的老年代分区。但随后G1并不会马上开启一次混合收集，而是让应用线程先运行一段时间，等待触发一次年轻代收集，在这次STW中，G1将开始整理混合收集周期。接着再次让应用线程运行，当接下来的几次年轻代收集时，将会有老年代分区加入到CSet中，即触发混合收集，这些连续多次的混合收集称为混合收集**。
+
+**当MixedGC执行之后还是无法申请到新的分区时，触发G1的担保机制，G1执行一次STW式的、单线程的 Full GC，Full GC会对整堆做标记清除和压缩，最后将只包含纯粹的存活对象。由于G1的应用场景往往堆内存都比较大，所以Full GC的收集代价非常昂贵，应该避免Full GC的发生**。
+
+
+
+#### G1 收集器的缺点
+
+* （1）如果停顿时间过短的话，可能导致每次选出的回收集只占堆内存很小一部分，收集器收集的速度逐渐跟不上分配器的分配速度，进而导致垃圾慢慢堆积，最终造成堆空间占满，引发Full GC 反而降低性能。
+* （2）G1 无论是在垃圾收集产生的内存占用还是程序运行时的额外执行负载都要比CMS要高
+* （3）CMS在小内存应用上大概率由于 G1。所以小内存的情况下使用CMS收集器，大内存的情况下可以使用G1收集器（G1收集器6GB以上）
+
+
+
+
+
+### 详细介绍一下ZGC收集器？
+
+ZGC 收集器是一款`基于 Region 内存布局`的，(暂时) 不设分代的，使用了`读屏障`、`染色指针`和`内存多重映射`等技术来实现可并发的`标记-整理`算法的，以低延迟为首要目标的一款垃圾收集器。
+
+
+
+#### ZGC内部布局
+
+与 Shenandoah 和 G1一样，ZGC 也采用基于 Region 的堆内存布局，但与它们不同的是 ， ZGC 的 Region 具 有 动 态 性 (动态创建和销毁 ， 以及动态的区域容量大小)。在 x64硬件平台下 ， ZGC 的 Region 可以具有大、中、小三类容量(如下图所示):
+
+- **小型 Region (Small Region )：**容量固定为 2M， 存放小于 256K 的对象。
+- **中型 Region (Medium Region)：**容量固定为 32M，放置大于等于256K但小于4M的对象。
+- **大型 Region (Large Region):** 容量不固定，可以动态变化，但必须为2MB 的整数倍，用于放置 4MB或以上的大对象。
+
+![](https://image.easyblog.top/%E6%88%AA%E5%B1%8F2023-04-09%20%E4%B8%8B%E5%8D%882.27.59.png)
+
+
+
+#### NUMA-aware
+
+和NUMA有个对应的概念叫UMA，NUMA是在UMA上面改进的，ZGC能自动感知NUMA架构并充分利用NUMA架构特性的，下面具体描述：
+
+* `UMA`：全称`Uniform Memory Access Architecture`(统一内存访问体系结构)，看到下图我们可以看出，UMA是多核CPU同时访问一块内存，这样的话就有内存的竞争，就会有锁，对应的就会有效率的降低，当CPU的核数越多，竞争就越激烈。
+* `NUMA`：全称`Non Uniform Memory AccessArchitecture`(非统一内存访问体系结构)，如图所示，它会将内存划分为相等大小的区域，每一块CPU会优先访问某一块内存，这样冲突就降低了很多，当自己优先的这块内存已被用完，它可以去访问其它内存块。
+
+![](http://image.easyblog.top/1681022471270dd2eef93-58ba-43c3-9763-87d564b085f4.png)
+
+
+
+#### 染色指针(Colored Pointer)
+
+染色指针，ZGC 的核心设计之一。以前的垃圾收集器的 GC 信息都保存在对象头中，而 ZGC 的 GC 信息保存在指针中(直接把标记信息记录在对象的引用指针上)。
+
+![](http://image.easyblog.top/1681022713837b430f8e3-7dde-47c1-9a34-26a033a991ff.png)
+
+每个对象有一个64位指针，这64位被分为：
+
+- 18位：预留给以后使用。
+- 1位：Finalizable标识，此位与并发引用处理有关，它表示这个对象只能通过finalizer才能访问(finalizer:object基类的一个空方法，如果被重写则会在GC之前调用该方法，该方法会且只会被调用一次)。
+- 1位：Remapped 标识，设置此位的值后，对象未指向relocation set中(relocation set表示需要GC的Region集合)，有值就说明对象被gc复制过。
+- 1位：Marked1标识。
+- 1位：Marked0标识，和上面的Marked1都是标记对象用于辅助GC。
+- 42位：对象的地址(所以它可以支持2^42=4T内存）
+
+
+
+#### 读屏脏
+
+由于ZGC采用的是复制整理的方式进行GC，很有可能在对象的位置改变之后指针位置尚未更新时程序调用了该对象，那么此时在程序需要并行的获取该对象的引用时，ZGC就会对该对象的指针进行读取，判断Remapped标识，如果标识为该对象位于本次需要清理的region区中，该对象则会有内存地址变化，会在指针中将新的引用地址替换原有对象的引用地址，然后再进行返回。 如此，使用读屏障便解决了并发GC的对象读取问题。
+
+
+
+
+
+#### ZGC的工作过程？
+
+![](http://image.easyblog.top/168102335122813c7ae75-5a0c-464a-b755-99549505b45a.png)
+
+ZGC工作过程整体可以分为四个阶段：
+
+* `并发标记（Concurrent Mark）`：与G1、Shenandoah一样，**并发标记是遍历对象图做可达性分析的阶段**，前后也要经过类似于G1、Shenandoah的初始标记、最终标记(尽管ZGC中的名字不叫这些)的短暂停顿，而且这些停顿阶段所做的事情在目标上也是相类似的。与G1、Shenandoah不同的是，ZGC的标记是在指针上而不是在对象上进行的，标记阶段会更新染色指针中的Marked 0、Marked 1标志位。
+
+* `并发预备重分配（Concurrent Prepare for Relocate）`：**这个阶段需要根据特定的查询条件统计得出本次收集过程要清理哪些Region，将这些Region组成重分配集(Relocation Set)**。重分配集与G1收集器的回收集(Collection Set)还是有区别的，ZGC划分Region的目的并非为了像G1那样做收益优先的增量回收。相反，ZGC每次回收都会扫描所有的Region，用范围更大的扫描成本换取省去G1中记忆集的维护成本。因此，ZGC的重分配集只是决定了里面的存活对象会被重新复制到其他的Region中，里面 的Region会被释放，而并不能说回收行为就只是针对这个集合里面的Region进行，因为标记过程是针对全堆的。此外，在JDK 12的ZGC中开始支持的类卸载以及弱引用的处理，也是在这个阶段中完成的。
+
+* `并发重分配（Concurrent Relocate）`：重分配是ZGC执行过程中的核心阶段，**这个过程要把重分配集中的存活对象复制到新的Region上，并为重分配集中的每个Region维护一个`转发表(Forward Table)`，记录从旧对象到新对象的转向关系**。得益于染色指针的支持，ZGC收集器能仅从引用上就明确得知一个对象是否处于重分配集之中，如果用户线程此时并发访问了位于重分配集中的对象，这次访问将会被预置的内存屏障所截获，然后立即根据Region上的转发表记录将访问转发到新复制的对象上，并同时修正更新该引用的值，使其直接指向新对象，ZGC将这种行为称为指针的`“自愈”(Self-Healing)能力`。
+* `并发重映射（Concurrent Remap）`：**重映射所做的就是修正整个堆中指向重分配集中旧对象的所有引用**，这一点从目标角度看是与 Shenandoah 并发引用更新阶段一样的，但是 ZGC 的并发重映射并不是一个必须要“迫切”去完成的任务，因为前面说过，即使是旧引用，它也是可以自愈的，最多只是第一次使用时多一次转发和修正操作。重映射清理这些旧引用的主要目的是为了不变慢(还有清理结束后可以释放转发表这样的附带收益)，所以说这并不是很“迫切”。因此，ZGC 很巧妙地把并发重映射阶段要做的工作，合并到了下一次垃圾收集循环中的并发标记阶段里去完成，反正它们都是要遍历所有对象的，这样合并就节省了一次遍历对象的开销。一旦所有指针都被修正之后，原来记录新旧对象关系的转发表就可以释放掉了。
+
+## 5.4 JVM调优和问题排查
+
+
+
+
+
+
+
+# 六、Spring
+
+## 6.1 Spring IOC
+
+### 谈谈对于 Spring IoC 的了解？
+
+`IOC（Inversion Of Controll，控制反转）`是一种设计思想，就是将原本在程序中手动创建对象的控制权，交给IOC容器来管理，并由IOC容器完成对象的注入。这样可以很大程度上简化应用的开发，把应用从复杂的依赖关系中解放出来。IOC容器就像是一个工厂一样，当我们需要创建一个对象的时候，只需要配置好配置文件/注解即可，完全不用考虑对象是如何被创建出来的。
+
+
+
+
+
+### 什么是Spring Bean?
+
+简单来说，Bean 代指的就是那些被 IoC 容器所管理的对象。
+
+我们需要告诉 IoC 容器帮助我们管理哪些对象，这个是通过配置元数据来定义的。配置元数据可以是 XML 文件、注解或者 Java 配置类。
+
+
+
+### 将一个类声明为 Bean 的注解有哪些?
+
+- `@Component` ：通用的注解，可标注任意类为 `Spring` 组件。如果一个 Bean 不知道属于哪个层，可以使用`@Component` 注解标注。
+- `@Repository` : 对应持久层即 Dao 层，主要用于数据库相关操作。
+- `@Service` : 对应服务层，主要涉及一些复杂的逻辑，需要用到 Dao 层。
+- `@Controller` : 对应 Spring MVC 控制层，主要用于接受用户请求并调用 `Service` 层返回数据给前端页面。
+
+
+
+### @Component 和 @Bean 的区别是什么？
+
+- `@Component` 注解作用于类，而`@Bean`注解作用于方法。
+- `@Component`通常是通过类路径扫描来自动侦测以及自动装配到 Spring 容器中（我们可以使用 `@ComponentScan` 注解定义要扫描的路径从中找出标识了需要装配的类自动装配到 Spring 的 bean 容器中）。`@Bean` 注解通常是我们在标有该注解的方法中定义产生这个 bean,`@Bean`告诉了 Spring 这是某个类的实例，当我需要用它的时候还给我。
+- `@Bean` 注解比 `@Component` 注解的自定义性更强，而且很多地方我们只能通过 `@Bean` 注解来注册 bean。比如当我们引用第三方库中的类需要装配到 `Spring`容器时，则只能通过 `@Bean`来实现。
+
+
+
+### 注入 Bean 的注解有哪些？
+
+Spring 内置的 `@Autowired` 以及 JDK 内置的 `@Resource` 和 `@Inject` 都可以用于注入 Bean。
+
+| Annotaion    | Package                            | Source       |
+| ------------ | ---------------------------------- | ------------ |
+| `@Autowired` | `org.springframework.bean.factory` | Spring 2.5+  |
+| `@Resource`  | `javax.annotation`                 | Java JSR-250 |
+| `@Inject`    | `javax.inject`                     | Java JSR-330 |
+
+`@Autowired` 和`@Resource`使用的比较多一些。
+
+
+
+### @Autowired 和 @Resource 注解的区别
+
+- `@Autowired` 是 Spring 提供的注解，`@Resource` 是 JDK 提供的注解。
+- `Autowired` 默认的注入方式为`byType`（根据类型进行匹配），`@Resource`默认注入方式为 `byName`（根据名称进行匹配）。
+- 当一个接口存在多个实现类的情况下，`@Autowired` 和`@Resource`都需要通过名称才能正确匹配到对应的 Bean。`Autowired` 可以通过 `@Qualifier` 注解来显式指定名称，`@Resource`可以通过 `name` 属性来显式指定名称。
+
+
+
+### Bean 的作用域有哪些?
+
+Spring 中 Bean 的作用域通常有下面几种：
+
+- **`singleton`** : IoC 容器中只有唯一的 bean 实例。Spring 中的 bean 默认都是单例的，是对单例设计模式的应用。
+- **`prototype`** : 每次获取都会创建一个新的 bean 实例。也就是说，连续 `getBean()` 两次，得到的是不同的 Bean 实例。
+- **`request`** （仅 Web 应用可用）: 每一次 HTTP 请求都会产生一个新的 bean（请求 bean），该 bean 仅在当前 HTTP request 内有效。
+- **`session`** （仅 Web 应用可用） : 每一次来自新 session 的 HTTP 请求都会产生一个新的 bean（会话 bean），该 bean 仅在当前 HTTP session 内有效。
+- **`application/global-session`** （仅 Web 应用可用）： 每个 Web 应用在启动时创建一个 Bean（应用 Bean），该 bean 仅在当前应用启动时间内有效。
+- **`websocket`** （仅 Web 应用可用）：每一次 WebSocket 会话产生一个新的 bean。
+
+
+
+**如何配置Bean的作用域呢？**
+
+```java
+@Bean
+@Scope(value = ConfigurableBeanFactory.SCOPE_PROTOTYPE)
+public Person personPrototype() {
+    return new Person();
+}
+```
+
+
+
+### 单例 Bean 的线程安全问题？
+
+对于单例Bean，所有线程都共享一个单例实例Bean，因此是存在资源的竞争。
+
+如果单例Bean 是一个无状态Bean，也就是线程中的操作不会对Bean的成员执行**「查询」**以外的操作，那么这个单例Bean是线程安全的。比如Spring mvc 的 Controller、Service、Dao等，这些Bean大多是无状态的，只关注于方法本身。
+
+对于Spring 单例 Bean的下车安全，常见的有两种解决办法：
+
+1. 在 Bean 中尽量避免定义可变的成员变量。
+2. 在类中定义一个 `ThreadLocal` 成员变量，将需要的可变成员变量保存在 `ThreadLocal` 中（推荐的一种方式）。
+
+
+
+> **spring单例，为什么controller、service和dao确能保证线程安全？**
+>
+> Controller、Service、DAO本身并不是线程安全，如果只是调用里面的方法，而且多线程调用一个实例的方法，会在内存中复制变量，这是自己的线程的工作内存，是安全的。（这一点参考JVM栈的共工作原理）
+
+
+
+### Bean 的生命周期?
+
+![Spring Bean 生命周期](https://images.xiaozhuanlan.com/photo/2019/24bc2bad3ce28144d60d9e0a2edf6c7f.jpg)
+
+* Bean 容器找到配置文件中 Spring Bean 的定义。
+* Bean 容器利用 Java 反射创建 Bean 的实例。
+  * 如果涉及到一些属性值利用 `set()`方法设置一些属性值。
+  * 如果 Bean 实现了 `BeanNameAware` 接口，调用 `setBeanName()`方法，传入 Bean 的名字。
+  * 如果 Bean 实现了 `BeanClassLoaderAware` 接口，调用 `setBeanClassLoader()`方法，传入 `ClassLoader`对象的实例。
+  * 如果 Bean 实现了 `BeanFactoryAware` 接口，调用 `setBeanFactory()`方法，传入 `BeanFactory`对象的实例。
+  * 与上面的类似，如果实现了其他 `*Aware`接口，就调用相应的方法。
+* 如果有和加载这个 Bean 的 Spring 容器相关的 `BeanPostProcessor` 对象，执行`postProcessBeforeInitialization()` 方法
+
+* 如果 Bean 实现了`InitializingBean`接口，执行`afterPropertiesSet()`方法。
+
+* 如果 Bean 在配置文件中的定义包含 init-method 属性，执行指定的方法。
+
+* 如果有和加载这个 Bean 的 Spring 容器相关的 `BeanPostProcessor` 对象，执行`postProcessAfterInitialization()` 方法
+
+* 当要销毁 Bean 的时候，如果 Bean 实现了 `DisposableBean` 接口，执行 `destroy()` 方法。
+
+* 当要销毁 Bean 的时候，如果 Bean 在配置文件中的定义包含 `destroy-method` 属性，执行指定的方法。
+
+
+
+## 6.2 Spring AOP
+
+### 谈谈对于 AOP 的了解？
+
+`AOP（Aspect-Oriented Programming，面向切面编程）`能够将那些与业务无关，却为业务模块所共同调用的逻辑或责任（例如事务处理、日志管理、权限控制等）封装起来，便于减少系统的重复代码，降低模块间的耦合度，并有利于未来的可扩展性和可维护性。**AOP的核心思想是基于代理思想，对目标对象创建代理对象，在不修改原目标对象的情况下，通过代理对象，调用增强功能代码，从而对原有业务方法的功能进行增强**。
+
+Spring AOP是基于动态代理的，如果需要代理的对象实现了某个接口，那么Spring AOP就会使用`JDK动态代理`去创建代理对象了；如果需要代理的对象没后接口，只有具体的类就无法使用JDK动态代理，此时Spring AOP会使用`CGLib动态代理`来创建代理对象。
+
+![SpringAOPProcess](https://oss.javaguide.cn/github/javaguide/system-design/framework/spring/230ae587a322d6e4d09510161987d346.jpeg)
+
+当然也可以使用`AspectJ`，Spring AOP中已经集成了AspectJ，AspectJ应该算得上是Java生态系统中最完整的AOP框架了。使用AOP之后我们可以把一些通用功能抽象出来，在需要用到的地方直接使用即可，这样可以大大简化代码量。我们需要增加新功能也方便，提高了系统的扩展性。日志功能、事务管理和权限管理等场景都用到了AOP。
+
+
+
+### AOP 有哪些实现方式？
+
+实现 AOP 的技术，主要分为两大类：
+
+- **静态代理**
+
+   指使用 AOP 框架提供的命令进行编译，从而在编译阶段就可生成 AOP 代理类，因此也称为编译时增强； 
+
+  - 编译时编织（特殊编译器实现），典型的实现比如：AspectJ
+  - 类加载时编织（特殊的类加载器实现）。
+
+- **动态代理**
+
+   在运行时在内存中“临时”生成 AOP 动态代理类，因此也被称为运行时增强。 
+
+  - JDK 动态代理 
+    - JDK Proxy 是 Java 语言自带的功能，无需通过加载第三方类实现；
+    - Java 对 JDK Proxy 提供了稳定的支持，并且会持续的升级和更新，Java 8 版本中的 JDK Proxy 性能相比于之前版本提升了很多；
+    - JDK Proxy 是通过拦截器加反射的方式实现的；
+    - JDK Proxy 只能代理实现接口的类；
+    - JDK Proxy 实现和调用起来比较简单；
+  - CGLIB 
+    - CGLib 是第三方提供的工具，基于 ASM 实现的，性能比较高；
+    - CGLib 无需通过接口来实现，它是针对类实现代理，主要是对指定的类生成一个子类，它是通过实现子类的方式来完成调用的。
+
+
+
+### AspectJ 定义的通知类型有哪些？
+
+- **Before**（前置通知）：目标对象的方法调用之前触发
+- **After** （后置通知）：目标对象的方法调用之后触发
+- **AfterReturning**（返回通知）：目标对象的方法调用完成，在返回结果值之后触发
+- **AfterThrowing**（异常通知） ：目标对象的方法运行中抛出 / 触发异常后触发。AfterReturning 和 AfterThrowing 两者互斥。如果方法调用成功无异常，则会有返回值；如果方法抛出了异常，则不会有返回值。
+- **Around** （环绕通知）：编程式控制目标对象的方法调用。环绕通知是所有通知类型中可操作范围最大的一种，因为它可以直接拿到目标对象，以及要执行的方法，所以环绕通知可以任意的在目标对象的方法调用前后搞事，甚至不调用目标对象的方法
+
+
+
+### 谈谈你对CGLib的理解？
+
+JDK 动态代理机制只能代理实现接口的类，一般没有实现接口的类不能进行代理。使用 CGLib 实现动态代理，完全不受代理类必须实现接口的限制。
+
+CGLib 的原理是对指定目标类生成一个子类，并覆盖其中方法实现增强，但因为采用的是继承，所以不能对 final 修饰的类进行代理。
+
+
+
+## 6.3 Spring MVC
+
+### 谈谈对Spring MVC的了解？
+
+MVC 是模型(Model)、视图(View)、控制器(Controller)的简写，其核心思想是通过将业务逻辑、数据、显示分离来组织代码。
+
+![img](https://oss.javaguide.cn/java-guide-blog/image-20210809181452421.png)
+
+MVC 是一种设计模式，Spring MVC 是一款很优秀的 MVC 框架。Spring MVC 可以帮助我们进行更简洁的 Web 层的开发，并且它天生与 Spring 框架集成。Spring MVC 下我们一般把后端项目分为 Service 层（处理业务）、Dao 层（数据库操作）、Entity 层（实体类）、Controller 层(控制层，返回数据给前台页面)。
+
+
+
+### Spring MVC 的核心组件有哪些？
+
+Spring合并组件有以下5个：
+
+- **`DispatcherServlet`** ：**核心的中央处理器**，负责接收请求、分发，并给予客户端响应。
+- **`HandlerMapping`** ：**处理器映射器**，根据 uri 去匹配查找能处理的 `Handler` ，并会将请求涉及到的拦截器和 `Handler` 一起封装。
+- **`HandlerAdapter`** ：**处理器适配器**，根据 `HandlerMapping` 找到的 `Handler` ，适配执行对应的 `Handler`；
+- **`Handler`** ：**请求处理器**，处理实际请求的处理器，通常就是程序员编写的controller方法。
+- **`ViewResolver`** ：**视图解析器**，根据 `Handler` 返回的逻辑视图 / 视图，解析并渲染真正的视图，并传递给 `DispatcherServlet` 响应客户端。
+
+
+
+### Spring MVC的工作流程？
+
+![img](http://image.easyblog.top/1597936663684c9fe5f02-c484-4866-baf1-88e4a152b2a6.png)
+
+**流程说明（重要）：**
+
+1. 客户端（浏览器）发出请求，`DispathcherServlet`获取到请求
+
+2. `DispatcherServlet`根据请求信息调用 `HandlerMapping`。`HandlerMapping` 根据 uri 去匹配查找能处理的 `Handler`（也就是我们平常说的 `Controller` 控制器） ，并会将请求涉及到的`拦截器`和 `Handler` 一起封装成`执行链(HandlerExecutionChain)`返回。
+3. `DispatcherServlet` 调用 `HandlerAdapter`适配执行 `Handler` 。
+4. `Handler` 完成对用户请求的处理后，会返回一个 `ModelAndView` 对象给`DispatcherServlet`， `ModelAndView` 顾名思义，包含了数据模型以及相应的视图的信息。`Model` 是返回的数据对象，`View` 是个逻辑上的 `View`。
+5. `ViewResolver` 会根据逻辑 `View` 查找实际的 `View`，比如当 Spring MVC 接收到 application/json 类型的响应请求时，它会查找合适的视图解析器，根据配置文件中的配置，找到适合处理该类型响应的视图解析器。Spring MVC 默认使用的是 `MappingJackson2JsonView` 视图解析器，它会将 Java 对象转换成 JSON 字符串并返回。
+6. `DispatcherServlet` 进行视图渲染 （视图渲染将模型数据(在ModelAndView对象中)填充到response域）
+7. `DispatcherServlet`返回响应给请求者（浏览器）
+
+
+
+### 统一异常处理怎么做？
+
+推荐使用注解的方式统一异常处理，具体会使用到 `@ControllerAdvice` + `@ExceptionHandler` 这两个注解 。
+
+```java
+@ControllerAdvice
+@ResponseBody
+public class GlobalExceptionHandler {
+
+    @ExceptionHandler(BaseException.class)
+    public ResponseEntity<?> handleAppException(BaseException ex, HttpServletRequest request) {
+      //......
+    }
+
+    @ExceptionHandler(value = ResourceNotFoundException.class)
+    public ResponseEntity<ErrorReponse> handleResourceNotFoundException(ResourceNotFoundException ex, HttpServletRequest request) {
+      //......
+    }
+}
+```
+
+这种异常处理方式下，会给所有或者指定的 `Controller` 织入异常处理的逻辑（AOP），当 `Controller` 中的方法抛出异常的时候，由被`@ExceptionHandler` 注解修饰的方法进行处理。
+
+
+
+## 6.4 Spring 事务
+
+### Spring 管理事务的方式有几种？
+
+- **编程式事务** ： 在代码中硬编码(不推荐使用) : 通过 `TransactionTemplate`或者 `TransactionManager` 手动管理事务，实际应用中很少使用，但是对于理解 Spring 事务管理原理有帮助。
+- **声明式事务** ： 在 XML 配置文件中配置或者基于注解（推荐使用） : 实际是通过 AOP 实现（基于`@Transactional` 的全注解方式使用最多）
+
+
+
+### Spring 事务中哪几种事务传播行为?
+
+**事务传播行为是为了解决业务层方法之间互相调用的事务问题**。
+
+当事务方法被另一个事务方法调用时，必须指定事务应该如何传播。例如：方法可能继续在现有事务中运行，也可能开启一个新事务，并在自己的事务中运行。
+
+正确的事务传播行为可能的值如下:
+
+**1.`TransactionDefinition.PROPAGATION_REQUIRED`**
+
+使用的最多的一个事务传播行为，我们平时经常使用的`@Transactional`注解默认使用就是这个事务传播行为。如果当前存在事务，则加入该事务；如果当前没有事务，则创建一个新的事务。
+
+**`2.TransactionDefinition.PROPAGATION_REQUIRES_NEW`**
+
+创建一个新的事务，如果当前存在事务，则把当前事务挂起。也就是说不管外部方法是否开启事务，`Propagation.REQUIRES_NEW`修饰的内部方法会新开启自己的事务，且开启的事务相互独立，互不干扰。
+
+**3.`TransactionDefinition.PROPAGATION_NESTED`**
+
+如果当前存在事务，则创建一个事务作为当前事务的嵌套事务来运行；如果当前没有事务，则该取值等价于`TransactionDefinition.PROPAGATION_REQUIRED`。
+
+**4.`TransactionDefinition.PROPAGATION_MANDATORY`**
+
+如果当前存在事务，则加入该事务；如果当前没有事务，则抛出异常。（mandatory：强制性）
+
+
+
+除了以上4个事务隔离级别，以下 3 种事务传播行为，事务将不会发生回滚：
+
+- **`TransactionDefinition.PROPAGATION_SUPPORTS`**: 如果当前存在事务，则加入该事务；如果当前没有事务，则以非事务的方式继续运行。
+- **`TransactionDefinition.PROPAGATION_NOT_SUPPORTED`**: 以非事务方式运行，如果当前存在事务，则把当前事务挂起。
+- **`TransactionDefinition.PROPAGATION_NEVER`**: 以非事务方式运行，如果当前存在事务，则抛出异常。
+
+
+
+### Spring 事务中的隔离级别有哪几种?
+
+事物的隔离级别（isolation level）定义了一个事务可能受其他并发事务影响的程度。 在并发事务中，经常会引起以下问题：
+
+* **脏读（Dirty reads）**——脏读发生在一个事务读取了另一个事务改写但尚未提交的数据时。如果改写在稍后被回滚了，那么第一个事务获取的数据就是无效的。
+
+- **不可重复读（Nonrepeatable read）**——不可重复读发生在一个事务执行相同的查询两次或两次以上，但是每次都得到不同的数据时。这通常是因为另一个并发事务在两次查询期间进行了更新。
+- **幻读（Phantom read）**——幻读与不可重复读类似。它发生在一个事务（T1）读取了几行数据，接着另一个并发事务（T2）插入了一些数据时。在随后的查询中，第一个事务（T1）就会发现多了一些原本不存在的记录。
+
+​    所以为了解决这些问题，引入了数据库的事务隔离级别的概念。Spring定义的事务隔离级别和数据库中定义的事务隔离级别是对应的，具体如下：
+
+| 隔离级别                     | 含义                                                         |
+| ---------------------------- | ------------------------------------------------------------ |
+| `ISOLATION_DEFAULT`          | 使用后端数据库默认的隔离级别，MySQL 默认采用的 `REPEATABLE_READ` 隔离级别 Oracle 默认采用的 `READ_COMMITTED` 隔离级别. |
+| `ISOLATION_READ_UNCOMMITTED` | 最低的隔离级别，允许读取尚未提交的数据变更，可能会导致脏读、幻读或不可重复读 |
+| `ISOLATION_READ_COMMITTED`   | 允许读取并发事务已经提交的数据，可以阻止脏读，但是幻读或不可重复读仍有可能发生 |
+| `ISOLATION_REPEATABLE_READ`  | 对同一字段的多次读取结果都是一致的，除非数据是被本身事务自己所修改，可以阻止脏读和不可重复读，但幻读仍有可能发生 |
+| `ISOLATION_SERIALIZABLE`     | 最高的隔离级别，完全服从ACID的隔离级别，确保阻止脏读、不可重复读以及幻读，也是最慢的事务隔离级别，因为它通常是通过完全锁定事务相关的数据库表来实现的 |
+
+
+
+### Spring 事务常见问题
+
+#### （1）大事务导致事务超时
+
+上周有一个功能，包含FTP文件上传及数据库操作，不知道是不是网络的原因，FTP把文件传输到对方服务器的时间特别长，导致后续的写库操作无法执行。后面是通过将功能拆分，不在事务内部执行文件上传，移到外层就行。
+
+
+
+#### （2）事务失效
+
+##### （2.1）非public方法失效
+
+在源码内部对于非public方式执行返回null,不支持对非public的事务支持
+
+![img](https://segmentfault.com/img/bVcSxIO)
+
+##### （2.2）rollbackFor配置为默认值
+
+将rollbackFor配置为默认值后，抛出非检查性异常时，事务无法回滚
+
+##### （2.3）使用了不支持事务的引擎
+
+在MySQL中支持事务的引擎是`innodb`
+
+
+
+# 七、Spring Boot
+
+### 什么是SpringBoot?
+
+Spring Boot 是 Spring 开源组织下的子项目，**是 Spring 组件一站式解决方案，主要是简化了使用 Spring 的难度，简省了繁重的配置，提供了各种启动器，开发者能快速上手**。
+
+* `独立运行`
+
+  Spring Boot 而且内嵌了各种 servlet 容器，Tomcat、Jetty 等，现在不再需要打成war 包部署到容器中，Spring Boot 只要打成一个可执行的 jar 包就能独立运行，所有的依赖包都在一个 jar 包内。
+
+* `简化配置`
+
+  spring-boot-starter-web 启动器自动依赖其他组件，简少了 maven 的配置。
+
+* `自动配置`
+
+  Spring Boot 能根据当前类路径下的类、jar 包来自动配置 bean，如添加一个 spring
+
+  boot-starter-web 启动器就能拥有 web 的功能，无需其他配置。
+
+* `无代码生成和XML配置`
+
+  Spring Boot 配置过程中无代码生成，也无需 XML 配置文件就能完成所有配置工作，这一切都是借助于条件注解完成的，这也是 Spring4.x 的核心功能之一。
+
+
+
+### SpringBoot核心注解有哪些？
+
+启动类上面的注解是`@SpringBootApplication`，他也是SpringBoot的核心注解，主要组合包含了以下3个注解：
+
+- `@SpringBootConfiguration`：组合了@Configuration注解，实现配置文件的功能；
+- `@EnableAutoConfiguration`：打开自动配置的功能，也可以关闭某个自动配置的选项，如关闭数据源自动配置的功能：
+- `@SpringBootApplication(exclude={DataSourceAutoConfiguration.class})`；
+- `@ComponentScan`：Spring组件扫描。
+
+
+
+### SpringBoot自动配置原理？
+
