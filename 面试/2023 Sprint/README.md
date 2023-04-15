@@ -4168,7 +4168,7 @@ public Person personPrototype() {
 
 
 
-### Bean 的生命周期?
+### Spring的Bean生命周期?
 
 ![Spring Bean 生命周期](https://images.xiaozhuanlan.com/photo/2019/24bc2bad3ce28144d60d9e0a2edf6c7f.jpg)
 
@@ -4190,6 +4190,241 @@ public Person personPrototype() {
 * 当要销毁 Bean 的时候，如果 Bean 实现了 `DisposableBean` 接口，执行 `destroy()` 方法。
 
 * 当要销毁 Bean 的时候，如果 Bean 在配置文件中的定义包含 `destroy-method` 属性，执行指定的方法。
+
+
+
+### 谈谈对循环依赖的理解？
+
+循环依赖顾名思义就是对象之间互相引用了对方，比如如下示例：
+
+```java
+public class CircularDependencyTest {
+
+
+    public static void main(String[] args) {
+        CircularBeanA circularBeanA = new CircularBeanA();
+        System.out.println(circularBeanA);
+    }
+
+
+}
+
+
+class CircularBeanA {
+    private CircularBeanB circularBeanB = new CircularBeanB();
+
+}
+
+
+class CircularBeanB {
+    private CircularBeanA circularBeanA = new CircularBeanA();
+}
+```
+
+
+
+上面代码中`CircularBeanA` 引用了 `CircularBeanB`，同时`CircularBeanB` 引用了 `CircularBeanA`，此时我们在`main`方法中实例化`CircularBeanA`，执行方法就会看到**栈溢出**报错
+
+![](http://image.easyblog.top/16814419445271906890f-c752-49bc-886d-668b8e0cdbe0.png)
+
+
+
+#### 为什么会报栈溢出呢？
+
+先来分析为什么缓存能解决循环依赖。
+
+上文分析得到，如下图所示，之所以产生循环依赖的问题，主要是：`A创建时--->需要B---->B去创建--->需要A`，从而产生了循环
+
+<img src="http://image.easyblog.top/16814430696042a1f278c-39ac-4cb9-bb23-e552d0dfae4f.png" style="zoom:40%;" />
+
+#### 解决循环依赖思路？
+
+通过分析我们知道，造成循环依赖的问题就在于对象之间的依赖关系死循环了，因此在创建对象实例时会造成构造方法栈溢出，那么打破这里死循环的思路就是主动打破这里的死循环，即加缓存，专业名词叫**提前暴露**，它的具体思路如下图所示：
+
+![](http://image.easyblog.top/16814500218987fa52c63-eda5-4f16-bbb1-5dd22fa6d5fe.png)
+
+我们可以加入一个缓存，这个缓存中存放对象实例半成品（未设置属性值的对象），然后A对象创建，在进行依赖注入之前先把A放入到缓存中，放入缓存后，再进行依赖注入，此时A的Bean依赖了B的Bean，如果B的Bean不存在，则需要创建B的Bean，而创建B的Bean的过程和A一样，也是先创建一个B的原始对象，然后把B的原始对象提早暴露出来放入缓存中，然后在对B的原始对象进行依赖注入A，此时能从缓存中拿到A的原始对象（虽然是A的原始对象，还不是最终的Bean），B的原始对象依赖注入完了之后，B的生命周期结束，那么A的生命周期也能结束。
+
+我们用这样的思路改善最初的代码，如下：
+
+```java
+public class CircularDependencyTest2 {
+
+    // 保存实例化过程中的半成品对象
+    private static final Map<String, Object> singletonObjets = new ConcurrentHashMap<>();
+
+    public static void main(String[] args) throws InstantiationException, IllegalAccessException {
+        System.out.println(getBean(CircularBeanA2.class));
+        System.out.println(getBean(CircularBeanB2.class));
+    }
+
+
+    private static <T> T getBean(Class<T> clazz) throws InstantiationException, IllegalAccessException {
+        // 获取bean name
+        String beanName = clazz.getSimpleName().toLowerCase();
+        // 缓存中存在就返回bean
+        if (singletonObjets.containsKey(beanName)) {
+            return (T) singletonObjets.get(beanName);
+        }
+        // 缓存中不存在就实例化bean，并将其放入缓存
+        T obj = clazz.newInstance();
+        singletonObjets.put(beanName, obj);
+        // 获取对象属性
+        Field[] fields = obj.getClass().getDeclaredFields();
+        // 遍历属性设置值
+        for (Field field : fields) {
+            field.setAccessible(true);
+            Class<?> fieldType = field.getType();
+            field.set(obj, getBean(fieldType));
+        }
+        return obj;
+    }
+
+}
+
+@Setter
+@Getter
+class CircularBeanA2 {
+    private CircularBeanB2 circularBeanB;
+
+}
+
+@Setter
+@Getter
+class CircularBeanB2 {
+    private CircularBeanA2 circularBeanA;
+}
+```
+
+
+
+上面的代码中，我们不再使用构造器注入的方式实例化对象，而是使用设值注入，因为通过分析我们知道**构造器注入的方式造成的循环依赖是无解的，上面`getBean`方法就是以set值的方式来初始化对象的，此外我们还需要一个Bean缓存来存储提前暴露的半成品对象，如果缓存中存在需要的bean就直接返回，否则实例化对象并将其放入缓存中，然后获取其所有属性遍历并set值。**
+
+
+
+### Spring到底解决了哪种情况下的循环依赖？
+
+针对Spring中Bean对象的各种场景，支持的方式不一样：
+
+![](http://image.easyblog.top/16814568250317f6ef999-6704-49c4-a118-0d8da8fa57da.png)
+
+* 对于单例模式：
+  * 如果是构造器注入，Spring 无法解决循环依赖，但是Spring会检测出循环依赖并报错，检测的原理就是通过对象提前暴露缓存实现的。
+  * 如果是设值注入，Spring 会通过三级缓存提前暴露对象来解决循环依赖
+* 对于原型模式：无论那种模式都无法直接通过Spring得到支持，不过设置注入可以使用`@Lazy`使用懒加载的方式实现解决循环依赖问题。
+
+
+
+
+
+
+
+### Spring循环依赖三级缓存的问题？
+
+从上面这个分析过程中可以得出，只需要一个缓存就能解决循环依赖了，那么为什么Spring中还需要三级缓存呢？
+
+**思考这样一个场景**：如果A的原始对象注入给B的属性之后，A的原始对象进行了AOP产生了一个代理对象，此时就会出现，对于A而言，它的Bean对象其实应该是AOP之后的代理对象，而B的a属性对应的并不是AOP之后的代理对象，这就产生了冲突。造成冲突的本质根源是B依赖的A和最终的A不是同一个对象。
+
+如何处理的，就是利用了第三级缓存**`singletonFactories`**。
+
+首先，`singletonFactories`中存的是某个beanName对应的ObjectFactory，在bean的生命周期中，生成完原始对象之后，就会构造一个ObjectFactory存入`singletonFactories`中。这个ObjectFactory是一个函数式接口，所以支持Lambda表达式：**`() -> getEarlyBeanReference(beanName, mbd, bean)`**。
+
+上面的Lambda表达式就是一个ObjectFactory，执行该Lambda表达式就会去执行getEarlyBeanReference方法，而该方法如下：
+
+```java
+protected Object getEarlyBeanReference(String beanName, RootBeanDefinition mbd, Object bean) {
+	Object exposedObject = bean;
+	if (!mbd.isSynthetic() && hasInstantiationAwareBeanPostProcessors()) {
+		for (BeanPostProcessor bp : getBeanPostProcessors()) {
+			if (bp instanceof SmartInstantiationAwareBeanPostProcessor) {
+				SmartInstantiationAwareBeanPostProcessor ibp = (SmartInstantiationAwareBeanPostProcessor) bp;
+				exposedObject = ibp.getEarlyBeanReference(exposedObject, beanName);
+			}
+		}
+	}
+	return exposedObject;
+}
+```
+
+该方法会去执行`SmartInstantiationAwareBeanPostProcessor`中的`getEarlyBeanReference`方法，而这个接口下的实现类中只有两个类实现了这个方法，一个是`AbstractAutoProxyCreator`，一个是`InstantiationAwareBeanPostProcessorAdapter`，它的实现如下：
+
+```java
+// InstantiationAwareBeanPostProcessorAdapter
+@Override
+public Object getEarlyBeanReference(Object bean, String beanName) throws BeansException {
+	return bean;
+}
+
+// AbstractAutoProxyCreator
+@Override
+public Object getEarlyBeanReference(Object bean, String beanName) {
+	Object cacheKey = getCacheKey(bean.getClass(), beanName);
+	this.earlyProxyReferences.put(cacheKey, bean);
+	return wrapIfNecessary(bean, beanName, cacheKey);
+}
+```
+
+`getEarlyBeanReference()`主要作恶以下几件事：
+
+* 首先得到一个cachekey，cachekey就是beanName。
+
+* 然后把beanName和bean（这是原始对象）存入`earlyProxyReferences`中
+
+* 调用wrapIfNecessary进行AOP，得到一个代理对象。
+
+
+
+
+
+**总结**：
+
+*  **Spring 能够解决循环依赖的情况**：主bean通过属性或者setter方法注入所依赖的bean，不是通过构造函数注入。
+
+* 循环依赖的解决：三级缓存实现，即`singletonObjects`，`earlySingletonObjects`和`singletonFactories`。
+  1. ` singletonObjects`：缓存某个beanName对应的经过了完整生命周期的bean
+  2. `earlySingletonObjects`：缓存提前拿原始对象进行了AOP之后得到的代理对象，原始对象还没有进行属性注入和后续的BeanPostProcessor等生命周期
+  3. `singletonFactories`：缓存的是一个ObjectFactory，主要用来去生成原始对象进行了AOP之后得到的代理对象，在每个Bean的生成过程中，都会提前暴露一个工厂，这个工厂可能用到，也可能用不到，如果没有出现循环依赖依赖本bean，那么这个工厂无用，本bean按照自己的生命周期执行，执行完后直接把本bean放入singletonObjects中即可，如果出现了循环依赖依赖了本bean，则另外那个bean执行ObjectFactory提交得到一个AOP之后的代理对象(如果有AOP的话，如果无需AOP，则直接得到一个原始对象)。
+  4. 其实还有一个缓存，就是`earlyProxyReferences`，它用来记录某个原始对象是否进行过AOP了。
+
+
+
+如下为DefaultSingletonBeanRegistry的getSingleton方法实现：该方法主要在AbstractBeanFactory的doGetBean方法调用。
+
+```java
+protected Object getSingleton(String beanName, boolean allowEarlyReference) {
+    // 检查一级缓存singletonObject是否存在
+	Object singletonObject = this.singletonObjects.get(beanName);
+	
+	// 当前还不存在这个单例对象，
+	// 且该对象正在创建中，即在singletonsCurrentlyInCreation列表中
+	if (singletonObject == null && isSingletonCurrentlyInCreation(beanName)) {
+		synchronized (this.singletonObjects) {
+		
+		    // 检查二级缓存earlySingletonObjects是否存在
+			singletonObject = this.earlySingletonObjects.get(beanName);
+			if (singletonObject == null && allowEarlyReference) {
+			
+			    // 检查三级缓存singletonFactory是否可以创建
+				ObjectFactory<?> singletonFactory = this.singletonFactories.get(beanName);
+				if (singletonFactory != null) {
+				
+				    // 三级缓存的对象工厂创建该对象
+					singletonObject = singletonFactory.getObject();
+					
+					// 放入二级缓存earlySingletonObjects中
+					this.earlySingletonObjects.put(beanName, singletonObject);
+					
+				    // 移除一级缓存
+					this.singletonFactories.remove(beanName);
+				}
+			}
+		}
+	}
+	return singletonObject;
+}
+```
+
+
 
 
 
