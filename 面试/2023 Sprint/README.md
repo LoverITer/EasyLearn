@@ -4170,26 +4170,258 @@ public Person personPrototype() {
 
 ### Spring的Bean生命周期?
 
-![Spring Bean 生命周期](https://images.xiaozhuanlan.com/photo/2019/24bc2bad3ce28144d60d9e0a2edf6c7f.jpg)
+Spring的Bean生命周期概括起来可以分为4大阶段：
 
-* Bean 容器找到配置文件中 Spring Bean 的定义。
-* Bean 容器利用 Java 反射创建 Bean 的实例。
-  * 如果涉及到一些属性值利用 `set()`方法设置一些属性值。
-  * 如果 Bean 实现了 `BeanNameAware` 接口，调用 `setBeanName()`方法，传入 Bean 的名字。
-  * 如果 Bean 实现了 `BeanClassLoaderAware` 接口，调用 `setBeanClassLoader()`方法，传入 `ClassLoader`对象的实例。
-  * 如果 Bean 实现了 `BeanFactoryAware` 接口，调用 `setBeanFactory()`方法，传入 `BeanFactory`对象的实例。
-  * 与上面的类似，如果实现了其他 `*Aware`接口，就调用相应的方法。
-* 如果有和加载这个 Bean 的 Spring 容器相关的 `BeanPostProcessor` 对象，执行`postProcessBeforeInitialization()` 方法
+1. **实例化（Instantiation）**
+2. **属性赋值（Populate）**
+3. **初始化（Initialization）**
+4. **销毁（Destruction）**
 
-* 如果 Bean 实现了`InitializingBean`接口，执行`afterPropertiesSet()`方法。
+![Spring Bean 生命周期](https://p1-jj.byteimg.com/tos-cn-i-t2oaga2asx/gold-user-assets/2020/2/15/1704860a4de235aa~tplv-t2oaga2asx-zoom-in-crop-mark:4536:0:0:0.awebp)
 
-* 如果 Bean 在配置文件中的定义包含 init-method 属性，执行指定的方法。
+#### 1.  **实例化**
 
-* 如果有和加载这个 Bean 的 Spring 容器相关的 `BeanPostProcessor` 对象，执行`postProcessAfterInitialization()` 方法
+通过反射API创建Bean实例，此阶段最终获得到的是一个不完整的Bean，因为Bean的属性均未设置值；
+
+
+
+#### 2.**属性赋值**
+
+调用`set()`方法设置Bean属性值
+
+
+
+#### 3.**初始化**
+
+这一阶段步骤较多，不过也主要分为以下5个步骤：
+
+##### 3.1 检查Aware相关接口并设置相关依赖
+
+* 如果 Bean 实现了 `BeanNameAware` 接口，调用 `setBeanName()`方法，传入 Bean 的名字。
+* 如果 Bean 实现了 `BeanClassLoaderAware` 接口，调用 `setBeanClassLoader()`方法，传入 `ClassLoader`对象的实例。
+* 如果 Bean 实现了 `BeanFactoryAware` 接口，调用 `setBeanFactory()`方法，传入 `BeanFactory`对象的实例。
+
+##### 3.2 BeanPostProcessor进行前置处理
+
+如果有和加载这个 Bean 的 Spring 容器相关的 `BeanPostProcessor` 对象，执行`postProcessBeforeInitialization()` 方法
+
+
+
+##### 3.3 InitializingBean初始化
+
+如果 Bean 实现了`InitializingBean`接口，执行`afterPropertiesSet()`方法。
+
+
+
+##### 3.4 自定义init-method初始化
+
+如果 Bean 在配置文件中的定义包含 init-method 属性，执行指定的方法。
+
+
+
+##### 3.5 BeanPostProcessor进行后置处理
+
+如果有和加载这个 Bean 的 Spring 容器相关的 `BeanPostProcessor` 对象，执行`postProcessAfterInitialization()` 方法
+
+
+
+#### 4.销毁
 
 * 当要销毁 Bean 的时候，如果 Bean 实现了 `DisposableBean` 接口，执行 `destroy()` 方法。
-
 * 当要销毁 Bean 的时候，如果 Bean 在配置文件中的定义包含 `destroy-method` 属性，执行指定的方法。
+
+
+
+
+
+结合代码来直观的看下，在 `doCreateBean()` 方法中能看到依次执行了这 4 个阶段：
+
+```java
+// AbstractAutowireCapableBeanFactory.java
+protected Object doCreateBean(final String beanName, final RootBeanDefinition mbd, final @Nullable Object[] args)
+    throws BeanCreationException {
+
+    // 1. 实例化
+    BeanWrapper instanceWrapper = null;
+    if (instanceWrapper == null) {
+        instanceWrapper = createBeanInstance(beanName, mbd, args);
+    }
+    
+    Object exposedObject = bean;
+    try {
+        // 2. 属性赋值
+        populateBean(beanName, mbd, instanceWrapper);
+        // 3. 初始化
+        exposedObject = initializeBean(beanName, exposedObject, mbd);
+    }
+
+    // 4. 销毁-注册回调接口
+    try {
+        registerDisposableBeanIfNecessary(beanName, bean, mbd);
+    }
+
+    return exposedObject;
+}
+```
+
+
+
+重点关注初始化阶段的流程，在`initializeBean`方法中我们看到如过程（注释的序号对应图中序号）：
+
+```java
+// AbstractAutowireCapableBeanFactory.java
+protected Object initializeBean(final String beanName, final Object bean, @Nullable RootBeanDefinition mbd) {
+  // 3. 检查 Aware 相关接口并设置相关依赖
+		if (System.getSecurityManager() != null) {
+			AccessController.doPrivileged((PrivilegedAction<Object>) () -> {
+				invokeAwareMethods(beanName, bean);
+				return null;
+			}, getAccessControlContext());
+		}
+		else {
+			invokeAwareMethods(beanName, bean);
+		}
+
+		Object wrappedBean = bean;
+		if (mbd == null || !mbd.isSynthetic()) {
+      // 4. BeanPostProcessor前置处理
+			wrappedBean = applyBeanPostProcessorsBeforeInitialization(wrappedBean, beanName);
+		}
+
+		try {
+      // 5. 若实现 InitializingBean 接口，调用 afterPropertiesSet() 方法
+      // 6. 若配置自定义的 init-method方法，则执行
+			invokeInitMethods(beanName, wrappedBean, mbd);
+		}
+		catch (Throwable ex) {
+			throw new BeanCreationException(
+					(mbd != null ? mbd.getResourceDescription() : null),
+					beanName, "Invocation of init method failed", ex);
+		}
+		if (mbd == null || !mbd.isSynthetic()) {
+      // 7. BeanPostProcessor后置处理
+			wrappedBean = applyBeanPostProcessorsAfterInitialization(wrappedBean, beanName);
+		}
+
+		return wrappedBean;
+	}
+```
+
+在 `invokInitMethods() `方法中会检查 InitializingBean 接口和 init-method 方法
+
+```java
+// AbstractAutowireCapableBeanFactory.java
+protected void invokeInitMethods(String beanName, final Object bean, @Nullable RootBeanDefinition mbd)
+			throws Throwable {
+   
+    //检查是否实现了InitializingBean接口，如果是，则调用afterPropertiesSet方法进行初始化
+		boolean isInitializingBean = (bean instanceof InitializingBean);
+		if (isInitializingBean && (mbd == null || !mbd.isExternallyManagedInitMethod("afterPropertiesSet"))) {
+			if (logger.isTraceEnabled()) {
+				logger.trace("Invoking afterPropertiesSet() on bean with name '" + beanName + "'");
+			}
+			if (System.getSecurityManager() != null) {
+				try {
+					AccessController.doPrivileged((PrivilegedExceptionAction<Object>) () -> {
+						((InitializingBean) bean).afterPropertiesSet();
+						return null;
+					}, getAccessControlContext());
+				}
+				catch (PrivilegedActionException pae) {
+					throw pae.getException();
+				}
+			}
+			else {
+				((InitializingBean) bean).afterPropertiesSet();
+			}
+		}
+
+    //检查是否实现了自定义初始化方法
+		if (mbd != null && bean.getClass() != NullBean.class) {
+			String initMethodName = mbd.getInitMethodName();
+			if (StringUtils.hasLength(initMethodName) &&
+					!(isInitializingBean && "afterPropertiesSet".equals(initMethodName)) &&
+					!mbd.isExternallyManagedInitMethod(initMethodName)) {
+				invokeCustomInitMethod(beanName, bean, mbd);
+			}
+		}
+	}
+```
+
+
+
+
+
+### Spring的Bean生命周期各节点扩展点？
+
+#### 1.Aware接口
+
+若 Spring 检测到 bean 实现了 Aware 接口，则会为其注入相应的依赖。所以**通过让bean 实现 Aware 接口，则能在 bean 中获得相应的 Spring 容器资源**。Spring 中提供的 Aware 接口有：
+
+1. `BeanNameAware`：注入当前 bean 对应 beanName；
+2. `BeanClassLoaderAware`：注入加载当前 bean 的 ClassLoader；
+3. `BeanFactoryAware`：注入 当前BeanFactory容器 的引用。
+
+以上是针对 BeanFactory 类型的容器，而对于 ApplicationContext 类型的容器，也提供了 Aware 接口，只不过这些 Aware 接口的注入实现，是通过 BeanPostProcessor 的方式注入的，但其作用仍是注入依赖。
+
+1. `EnvironmentAware`：注入 Enviroment，一般用于获取配置属性；
+2. `EmbeddedValueResolverAware`：注入 EmbeddedValueResolver（Spring EL解析器），一般用于参数解析；
+3. `ApplicationContextAware`（ResourceLoader、ApplicationEventPublisherAware、MessageSourceAware）：注入 ApplicationContext 容器本身。
+
+
+
+#### 2.BeanPostProcessor
+
+BeanPostProcessor 是 Spring 为**修改 bean**提供的强大扩展点，其可作用于容器中所有 bean，常用场景有：
+
+1. 对于标记接口的实现类，进行自定义处理。例如1中所说的`ApplicationContextAwareProcessor`，为其注入相应依赖；再举个例子，自定义对实现解密接口的类，将对其属性进行解密处理；
+2. 为当前对象提供代理实现。例如 Spring AOP 功能，生成对象的代理类，然后返回。
+
+
+
+#### 3.InitializingBean 和 init-method
+
+InitializingBean 和 init-method 是 Spring 为 **bean 初始化**提供的扩展点。
+
+##### InitializingBean
+
+InitializingBean接口 的定义如下：
+
+```csharp
+public interface InitializingBean {
+	void afterPropertiesSet() throws Exception;
+}
+```
+
+Bean对象需要继承InitializingBean接口，并重写 afterPropertiesSet() 方法写初始化逻辑。
+
+
+
+##### init-method
+
+指定 init-method 方法，指定初始化方法：
+
+使用xml配置文件：
+
+```xml
+<?xml version="1.0" encoding="UTF-8"?>
+<beans xmlns="http://www.springframework.org/schema/beans"
+       xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+       xsi:schemaLocation="http://www.springframework.org/schema/beans http://www.springframework.org/schema/beans/spring-beans.xsd">
+
+    <bean id="demo" class="com.chaycao.Demo" init-method="init()"/>
+    
+</beans>
+```
+
+使用注解方式：
+
+```java
+@Bean(initMethod="init")
+public Bean createBean(){
+  //...
+}
+```
 
 
 
@@ -4321,6 +4553,8 @@ class CircularBeanB2 {
 
 ### Spring循环依赖三级缓存的问题？
 
+#### Spring解决循环依赖为什么需要三级缓存？
+
 从上面这个分析过程中可以得出，只需要一个缓存就能解决循环依赖了，那么为什么Spring中还需要三级缓存呢？
 
 **思考这样一个场景**：如果A的原始对象注入给B的属性之后，A的原始对象进行了AOP产生了一个代理对象，此时就会出现，对于A而言，它的Bean对象其实应该是AOP之后的代理对象，而B的a属性对应的并不是AOP之后的代理对象，这就产生了冲突。造成冲突的本质根源是B依赖的A和最终的A不是同一个对象。
@@ -4374,6 +4608,34 @@ public Object getEarlyBeanReference(Object bean, String beanName) {
 
 
 
+所以很明显，在整个Spring中，默认就只有AbstractAutoProxyCreator真正意义上实现了getEarlyBeanReference 方法，而该类就是用来进行AOP的。
+
+
+
+#### getEarlyBeanReference的调用时机
+
+![](http://image.easyblog.top/1681565309333dfd6f912-73d5-4801-8f20-2e72cc4aa9c9.png)
+
+根据上面的分析，A原始对象在创建的时候会向Spring的第三级缓存`singletonFactories`中保存一个`ObjectFactory`，其实就是lambda表达式，需要注意存入singletonFactories时并不会执行lambda表达式，也就是不会执行`getEarlyBeanReference`方法。
+
+
+
+在创建B时需要A，此时会从根据beanName从singletonFactories获取到一个ObjectFactory，然后执行ObjectFactory，也就是**执行getEarlyBeanReference方法，此时会得到一个A原始对象经过AOP之后的代理对象，然后把该代理对象放入`earlySingletonObjects`中，注意此时并没有把代理对象放入singletonObjects中**，那什么时候放入到singletonObjects中呢？
+
+此时，我们只获得了A原始对象的代理对象，这个对象还不是完整的，因为A对象还没有进行属性填充，所以此时不能直接把A对象的代理对象直接放入singletonObjets，所以只能暂时现A这种状态的对象的代理对象放入到earlySingletonObjects缓存中，这样当其他对象依赖A时就可以直接从earlySingletonObjects获取到A原始对象的代理对象了，并且是A的同一个代理对象。
+
+
+
+当B创建完成后A继续它的生命周期，A在完成属性注入后，会按照它本身的逻辑去进行AOP，而此时我们知道A原始对象已经经历过了AOP，所以对于A本身而言，不会再去进行AOP了。
+
+>  **怎么判断一个对象是否经历过了AOP呢**？
+>
+> 会利用上文提到的`earlyProxyReferences`，在AbstractAutoProxyCreator的postProcessAfterInitialization方法中，会去判断当前beanName是否在earlyProxyReferences，如果在则表示已经提前进行过AOP了，无需再次进行AOP。
+
+
+
+对于A而言，进行了AOP的判断后，以及BeanPostProcessor的执行之后，就需要把A对应的对象放入singletonObjects中了，但是我们知道，应该是要A的代理对象放入singletonObjects中，所以此时需要从earlySingletonObjects中得到代理对象，然后入singletonObjects中。
+
 
 
 **总结**：
@@ -4385,46 +4647,6 @@ public Object getEarlyBeanReference(Object bean, String beanName) {
   2. `earlySingletonObjects`：缓存提前拿原始对象进行了AOP之后得到的代理对象，原始对象还没有进行属性注入和后续的BeanPostProcessor等生命周期
   3. `singletonFactories`：缓存的是一个ObjectFactory，主要用来去生成原始对象进行了AOP之后得到的代理对象，在每个Bean的生成过程中，都会提前暴露一个工厂，这个工厂可能用到，也可能用不到，如果没有出现循环依赖依赖本bean，那么这个工厂无用，本bean按照自己的生命周期执行，执行完后直接把本bean放入singletonObjects中即可，如果出现了循环依赖依赖了本bean，则另外那个bean执行ObjectFactory提交得到一个AOP之后的代理对象(如果有AOP的话，如果无需AOP，则直接得到一个原始对象)。
   4. 其实还有一个缓存，就是`earlyProxyReferences`，它用来记录某个原始对象是否进行过AOP了。
-
-
-
-如下为DefaultSingletonBeanRegistry的getSingleton方法实现：该方法主要在AbstractBeanFactory的doGetBean方法调用。
-
-```java
-protected Object getSingleton(String beanName, boolean allowEarlyReference) {
-    // 检查一级缓存singletonObject是否存在
-	Object singletonObject = this.singletonObjects.get(beanName);
-	
-	// 当前还不存在这个单例对象，
-	// 且该对象正在创建中，即在singletonsCurrentlyInCreation列表中
-	if (singletonObject == null && isSingletonCurrentlyInCreation(beanName)) {
-		synchronized (this.singletonObjects) {
-		
-		    // 检查二级缓存earlySingletonObjects是否存在
-			singletonObject = this.earlySingletonObjects.get(beanName);
-			if (singletonObject == null && allowEarlyReference) {
-			
-			    // 检查三级缓存singletonFactory是否可以创建
-				ObjectFactory<?> singletonFactory = this.singletonFactories.get(beanName);
-				if (singletonFactory != null) {
-				
-				    // 三级缓存的对象工厂创建该对象
-					singletonObject = singletonFactory.getObject();
-					
-					// 放入二级缓存earlySingletonObjects中
-					this.earlySingletonObjects.put(beanName, singletonObject);
-					
-				    // 移除一级缓存
-					this.singletonFactories.remove(beanName);
-				}
-			}
-		}
-	}
-	return singletonObject;
-}
-```
-
-
 
 
 
