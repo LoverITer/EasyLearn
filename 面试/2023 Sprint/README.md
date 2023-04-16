@@ -4650,9 +4650,68 @@ public Object getEarlyBeanReference(Object bean, String beanName) {
 
 
 
+
+
+### BeanFactory 和 FactoryBean的区别？
+
+在Spring中有BeanFactory和FactoryBean这2个接口，从名字来看很相似，比较容易搞混。
+
+#### BeanFactory
+
+`BeanFactory` 是一个接口，它是Spring中工厂的顶层规范，是Spring容器的核心接口，它定义了`getBean()`、`containsBean()`、`isSignleton()`等一系列管理Bean的方法，Spring 容器都是它的具体实现，例如：
+
+* DefaultListableBeanFactory
+* XmlBeanFactory
+* ApplicationContext
+
+
+
+#### FactoryBean
+
+`FactoryBean` 也是一个接口，它是一个Bean，但又不仅仅是一个Bean。**它是一个能够生产或修饰对象生成的工厂Bean，类似设计模式中的工程模式和装饰器模式，它能在需要的时候生产一个对象，且不仅仅限于它自身，它能返回任何Bean的实例**。
+
+如下是FactoryBean的定义：
+
+```java
+public interface FactoryBean<T> {
+
+	//从工厂中获取bean
+	@Nullable
+	T getObject() throws Exception;
+
+	//获取Bean工厂创建的对象的类型
+	@Nullable
+	Class<?> getObjectType();
+
+	//Bean工厂创建的对象是否是单例模式
+	default boolean isSingleton() {
+		return true;
+	}
+}
+```
+
+从它的接口定义中可以看出，`FactoryBean`表现出的是一个工厂的职责。**即一个Bean A如果实现了BeanFactory接口，那么A久变成了一个工厂，根据A的名字获取的实际实际上是工厂调用`getObject()`返回的对象，而不是A本身，如果要获取工厂A自身的实例，那么需要在名称前面加上'`&`'符号**
+
+
+
+**说了这么多，为什么要有`FactoryBean`这个东西呢，有什么具体的作用吗？**
+
+FactoryBean在Spring中最为典型的一个应用就是用来**创建AOP的代理对象**。
+
+AOP实际上是Spring在运行时创建了一个代理对象，也就是说这个对象，是我们在运行时创建的，而不是一开始就定义好的，这很符合工厂方法模式。更形象地说，AOP代理对象通过Java的反射机制，在运行时创建了一个代理对象，在代理对象的目标方法中根据业务要求织入了相应的方法。这个对象在Spring中就是`ProxyFactoryBean`。
+
+
+
+**总结**
+
+* **BeanFactory 和 FactoryBean 都是工厂，但FactoryBean本质上还是一个Bean，也归BeanFactory管理**。
+* **BeanFactory 是Spring容器的顶层接口，而FactoryBean更像是用户自定义的工厂接口**。
+
+
+
 ## 6.2 Spring AOP
 
-### 谈谈对于 AOP 的了解？
+### 谈谈对 AOP 的了解？
 
 `AOP（Aspect-Oriented Programming，面向切面编程）`能够将那些与业务无关，却为业务模块所共同调用的逻辑或责任（例如事务处理、日志管理、权限控制等）封装起来，便于减少系统的重复代码，降低模块间的耦合度，并有利于未来的可扩展性和可维护性。**AOP的核心思想是基于代理思想，对目标对象创建代理对象，在不修改原目标对象的情况下，通过代理对象，调用增强功能代码，从而对原有业务方法的功能进行增强**。
 
@@ -4706,6 +4765,10 @@ Spring AOP是基于动态代理的，如果需要代理的对象实现了某个�
 JDK 动态代理机制只能代理实现接口的类，一般没有实现接口的类不能进行代理。使用 CGLib 实现动态代理，完全不受代理类必须实现接口的限制。
 
 CGLib 的原理是对指定目标类生成一个子类，并覆盖其中方法实现增强，但因为采用的是继承，所以不能对 final 修饰的类进行代理。
+
+
+
+### Spring AOP的原理/如何生成代理类的？
 
 
 
@@ -4777,12 +4840,49 @@ public class GlobalExceptionHandler {
 
 ## 6.4 Spring 事务
 
-### Spring 管理事务的方式有几种？
+### Spring 管理事务的方式有几种/事务实现方式？
 
-- **编程式事务** ： 在代码中硬编码(不推荐使用) : 通过 `TransactionTemplate`或者 `TransactionManager` 手动管理事务，实际应用中很少使用，但是对于理解 Spring 事务管理原理有帮助。
-- **声明式事务** ： 在 XML 配置文件中配置或者基于注解（推荐使用） : 实际是通过 AOP 实现（基于`@Transactional` 的全注解方式使用最多）
+- **编程式事务** ： 在代码中硬编码(不推荐使用) ，通过 `TransactionTemplate`或者 `TransactionManager` 手动管理事务，实际应用中很少使用，但是对于理解 Spring 事务管理原理有帮助。
 
+  ```java
+  @Service
+  public class TransactionDemo {
+      
+      @Autowired
+      private TransactionTemplate transactionTemplate;
+  
+    
+      // 手动管理事务
+      public void programmaticUpdate() {
+          // 这里也可以使用Lambda表达式
+          transactionTemplate.execute(new TransactionCallbackWithoutResult() {
+              protected void doInTransactionWithoutResult(TransactionStatus status) {
+                  updateOperation1();
+                  updateOperation2();
+              }
+          });
+      }
+  }
+  ```
 
+  
+
+- **声明式事务** ： 在 XML 配置文件中配置或者基于注解 `@Transactional` ， 实际是通过 AOP 实现，其本质是通过AOP功能，对方法前后进行拦截，将事务处理的功能编织到拦截的方法中，也就是在目标方法开始之前启动一个事务，在执行完目标方法之后根据执行情况提交或者回滚事务。
+
+  ```java
+  @Service
+  public class TransactionDemo {
+      
+  
+      @Transactional   // 基于注解管理事务
+      public void programmaticUpdate() {
+          updateOperation1();
+          updateOperation2();
+      }
+  }
+  ```
+
+  
 
 ### Spring 事务中哪几种事务传播行为?
 
@@ -4865,6 +4965,127 @@ public class GlobalExceptionHandler {
 
 
 
+### Spring 事务注解的本质？
+
+**Spring 事务注解 `@Transactional` 注解的逻辑主要是依赖Spring AOP原理实现，其本质是通过AOP功能，对方法前后进行拦截，将事务处理的功能编织到拦截的方法中，也就是在目标方法开始之前启动一个事务，在执行完目标方法之后根据执行情况提交或者回滚事务**。
+
+我们了解Spring事务注解的运行原理，实际就是去了解事务注解动态代理类的生成过程，这个过程主要分为两个步骤：
+
+1. 向Spring容器注册事务相关的切面逻辑
+2. 根据切面逻辑生成动态代理（本质是Spring Aop生成代理的原理）
+
+下面围绕这两点来看下Spring声明事务的实现原理：
+
+#### @EnableTransactionManagement工作原理（加载事务切面逻辑）
+
+Spring 切面逻辑里有三个概念：
+
+* `Pointcut`：负责告诉spring容器哪个类需要增强
+* `Advise`：具体的切面逻辑，这里就是根据异常进行commit或者回滚的相关逻辑
+* `Advisor`：封装了`Advise`和`Pointcut`的类
+
+
+
+我们开启Spring的声明式事务所使用的`@EnableTransactionManagement`注解，本质上就是增加了一个Advisor，当我们使用`@EnableTransactionManagement`注解来开启Spring事务时，该注解代理的功能就是向Spring容器中添加了两个Bean：
+
+- **AutoProxyRegistrar**
+- **ProxyTransactionManagementConfiguration**
+
+##### AutoProxyRegistrar
+
+AutoProxyRegistrar主要的作用是向Spring容器中注册了一个`InfrastructureAdvisorAutoProxyCreator`的Bean。而`InfrastructureAdvisorAutoProxyCreator`继承了`AbstractAdvisorAutoProxyCreator`，所以这个类的主要作用就是开启自动代理的作用，也就是一个BeanPostProcessor，会在初始化后步骤中去寻找Advisor类型的Bean，并判断当前某个Bean是否有匹配的Advisor，是否需要利用动态代理产生一个代理对象。
+
+
+
+##### ProxyTransactionManagementConfiguration
+
+`ProxyTransactionManagementConfiguration`是一个配置类，它又定义了另外三个bean：
+
+- **BeanFactoryTransactionAttributeSourceAdvisor**：一个Advisor，该类实现了`PointcutAdvisor`接口
+- **AnnotationTransactionAttributeSource**：相当于`BeanFactoryTransactionAttributeSourceAdvisor`中的Pointcut，`AnnotationTransactionAttributeSource`就是用来判断某个类上是否存在`@Transactional`注解，或者判断某个方法上是否存在`@Transactional`注解的。
+- **TransactionInterceptor**：相当于`BeanFactoryTransactionAttributeSourceAdvisor`中的Advice，TransactionInterceptor就是代理逻辑，当某个类中存在`@Transactional`注解时，到时就产生一个代理对象作为Bean，代理对象在执行某个方法时，最终就会进入到TransactionInterceptor的`invoke()`方法。
+
+![](http://image.easyblog.top/168164797905397945a0e-07ef-4f96-98e1-efe1d8a9ee3b.png)
+
+
+
+到这里，Spring容器加载了需要实现事务相关切面的关键的三个对象，其中`Pointcut`的匹配逻辑就是看这个方法有没有被`@Transactional`注解标注，最终会调用到`SpringTransactionAnnotationParser`类的`parseTransactionAnnotation`方法里。
+
+![](http://image.easyblog.top/1681649836547bc8df1d3-c5cf-4274-893e-a556e9399471.png)
+
+
+
+##### TransactionInterceptor 事务代理逻辑
+
+这里主要看下事务的核心逻辑，这个核心逻辑就在实现了`Advise`接口的`TransactionInterceptor`类的`invoke`方法里，这里看下这里的源码：
+
+```java
+public Object invoke(MethodInvocation invocation) throws Throwable {
+   Class<?> targetClass = (invocation.getThis() != null ? AopUtils.getTargetClass(invocation.getThis()) : null);
+    // 调用事务逻辑
+    return invokeWithinTransaction(invocation.getMethod(), targetClass, invocation::proceed);
+}
+
+@Nullable
+protected Object invokeWithinTransaction(Method method, @Nullable Class<?> targetClass, TransactionAspectSupport.InvocationCallback invocation) throws Throwable {
+  TransactionAttributeSource tas = this.getTransactionAttributeSource();
+  // 获取改方法上的事务配置，包括传播级别、异常信息等配置
+  TransactionAttribute txAttr = tas != null ? tas.getTransactionAttribute(method, targetClass) : null;
+  // 事务管理器，负责生成事务上下文信息，比如开启事务、获取数据库链接等逻辑
+  TransactionManager tm = this.determineTransactionManager(txAttr);
+  ...
+  PlatformTransactionManager ptm = this.asPlatformTransactionManager(tm);
+  String joinpointIdentification = this.methodIdentification(method, targetClass, txAttr);
+  // 根据传播级别配置，看是否需要新建事务
+  TransactionAspectSupport.TransactionInfo txInfo = this.createTransactionIfNecessary(ptm, txAttr, joinpointIdentification);
+
+  Object retVal;
+  // 通过try catch捕获异常来实现回滚逻辑
+  try {
+  // 调用真正的dao层逻辑
+      retVal = invocation.proceedWithInvocation();
+  } catch (Throwable var18) {
+  // 根据@Transactional配置的异常来决定是否回滚
+      this.completeTransactionAfterThrowing(txInfo, var18);
+      throw var18;
+  } finally {
+  // 结束当前的事务，信息是保存在ThreadLocal里
+      this.cleanupTransactionInfo(txInfo);
+  }
+
+  if (retVal != null && vavrPresent && TransactionAspectSupport.VavrDelegate.isVavrTry(retVal)) {
+      TransactionStatus status = txInfo.getTransactionStatus();
+      if (status != null && txAttr != null) {
+          retVal = TransactionAspectSupport.VavrDelegate.evaluateTryFailure(retVal, txAttr, status);
+      }
+  }
+  // 没有异常时，执行commit操作
+  this.commitTransactionAfterReturning(txInfo);
+  return retVal;
+  ...
+  
+}
+```
+
+**总结下核心步骤如下**：
+
+网上大佬画的Spring事务原理流程图：https://www.processon.com/view/link/5fab6edf1e0853569633cc06
+
+通过动态代理为标注了`@Transactional`注解的方法增加切面逻辑，而事务的上下文包括数据库链接都是通过`ThreadLocal`来传递，在这个切面逻辑里主要做这几个事情：
+
+1. 获取方法上标注的注解的元数据，包括传播级别、异常配置等信息
+2. 通过`ThreadLocal`获取事务上下文，检查是否已经激活事务
+3. 如果已经激活事务，则根据传播级别配置，看是否需要新建事务（如果新建事务，会生成一个新的事务上下文对象`TransactionInfo`，并将上一个事务上下文赋值到新上下文的oldTransactionInfo属性上）代码位置在`TransactionAspectSupport`类的`prepareTransactionInfo`方法里的`bindToThread`方法里
+4. 开启事务，先通过数据库连接池获取链接，关闭链接的`autocommit`，然后在`try catch`里反射执行真正的`DAO`操作，通过异常情况来决定是`commit`还是`rollback`
+
+
+
+
+
+
+
+
+
 # 七、Spring Boot
 
 ### 什么是SpringBoot?
@@ -4904,3 +5125,82 @@ Spring Boot 是 Spring 开源组织下的子项目，**是 Spring 组件一站�
 
 ### SpringBoot自动配置原理？
 
+每个SpringBoot应用入口类（启动类）定义头上都会有一个`@SpringBootApplication`注解，这个注解由三个核心注解构成：`@SpringBootConfiguration`、`@EnableAutoConfiguration` 和`@CompmentScan`
+
+![](http://image.easyblog.top/1681653947090365dc787-7805-4124-9c99-9c4acf6e5bc2.png)
+
+
+
+#### @SpringBootConfiguration
+
+`@SpringBootConfiguration`，标注这是一个配置类，作用和`@Configuration`类似，@Configuration` 注解的作用是将其作为一个配置类，来配置 `Spring` 的上下文，相当于 `Spring` 的 `XML` 配置文件中的` `<beans>`
+
+
+
+#### @ComponentScan
+
+这个的作用就是 **扫描指定路径下的组件**，并加入到 **`IOC` 容器** 中,相当于Spring的 XML配置文件中的 `<context:component-scan/>`
+
+
+
+#### @EnableAutoConfiguration
+
+![](http://image.easyblog.top/16816543581332b372ec7-a794-45c2-9281-9a367c12c1c5.png)
+
+`@EnableAutoConfiguration`：**实现自动导入的核心注解**。它也是一个复合注解，重要的注解有两个：`@AutoConfigurationPackage` 和 `@Import(AutoConfigurationImportSelector.class)`
+
+##### @AutoConfigurationPackage
+
+![](http://image.easyblog.top/16816546343042c4da6f5-6527-4b9f-a7f1-4f5492a26e9f.png)
+
+从名字就可以看出它是一个 **自动配置包路径** 的注解，它的作用是当没有配置 `basePackages` 或者 `basePackageClasses` 时，这个类就会自动**将该注解所在的包作为基本路径进行注册**
+
+
+
+##### @Import(AutoConfigurationImportSelector.class)
+
+它使用`@Imoprt`导入了一个类—`AutoConfigurationImportSelector`，这个类是`ImportSelector`接口的一个实现类，接口中定义有一个`selectImports`方法，AutoConfigurationImportSelector在方法实现中会加载项目classpah下所有`META-INF/spring.factories`配置，并且依次的去创建这个集合中的所有的类的全路径对象。
+
+**（1）process**
+
+这个方法在获取这些 `Import` 类时会被调用，其中 `getAutoConfigurationEntry` 方法就是从`META-INF/spring.factories`配置加载自动配置类的步骤。
+
+![](http://image.easyblog.top/16816551490585ef37f50-6a3d-4654-a12f-151353c1a6fd.png)
+
+
+
+**（2）getAutoConfigurationEntry**
+
+获取自动配置类实体
+
+![](http://image.easyblog.top/1681655379085551d56eb-5b6f-42cd-9b09-e8653c689897.png)
+
+
+
+**（3）getCandidateConfiguration**
+
+![](http://image.easyblog.top/16816556068628040d21e-752e-42f3-a1a0-e7ffe07ac20b.png)
+
+来到这里，可以发现它调用到这个 `SpringFactoriesLoader`，这里SpringBoot使用了Spring提供的  `SPI` 机制，进入方法内部可以发现它加载的是  `META-INF/spring.factories` 这个文件 ,相比 `java` 的  `META-INF/services` ，有以下的不同点：
+
+1. 从名字上就可以发现很大的不同（ 一个是 `factories` 文件，一个是以**接口全名**命名的文件 ）。
+2. `spring.factories`  以一个聚合的作用，把相应的接口和实现类以  **key = value** 形式展现在 `spring.factories` 文件中。
+3. `spring.factories`  中的所有配置项会加载到我们的缓存中，以  `Map<String,List<String>>` 形式存储，但不是所有的都会被实例化，被加载到 `IOC` 容器中，除了必要的类外（ `EventPublishingRunListener` 等 ），还有**满足特定条件**下的自动配置类会被加载到 `IOC` 容器中
+
+
+
+#### 总结
+
+1.  `SpringBoot` 的自动装配很重要的一点就是，就是要在配置类上开启 `@EnableAutoConfiguration` 或者 `@SpringBootApplication`  注解，来让自动配置**生效**。
+
+2. 自动配置的核心是 `Spring` 的 `SPI` 机制 ，以及**组件选择器**`AutoConfigurationImportSelector`，具体是通过其中的 `getAutoConfigurationEntry` 方法来获取 `SPI` 中的自动配置类并进行过滤，最后通过 `processImports` 将配置类加载到 `IOC` 容器中，完成自动配置。
+
+
+
+### SpringBoot如何自定义starter?
+
+
+
+
+
+### SpringBoot启动过程？
