@@ -1,7 +1,7 @@
 <p align="center">
     <h1 align="center" style="border: none">📚 EasyLearn</h1>
     <p align="center">
-       <b>学的不仅仅是技术，更是梦想！</b>
+       <b>Easy Learn,Easy Use</b>
         <br>
         <br>
         <a href=#><img src="https://img.shields.io/badge/Java-%E9%9D%A2%E8%AF%95%E6%8C%87%E5%8D%97-orange"></a>
