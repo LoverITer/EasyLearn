@@ -5197,10 +5197,140 @@ Spring Boot 是 Spring 开源组织下的子项目，**是 Spring 组件一站�
 
 
 
-### SpringBoot如何自定义starter?
-
-
-
-
-
 ### SpringBoot启动过程？
+
+SpringBoot拼接极简的配置和一键启动，在极短的时间内就俘获了大量Javaer的“芳心”，那么SpringBoot带给我们这么多便利的背后，它都做了些什么，让我们就跟随spirng boot的整个启动流程一探究竟。
+
+![](http://image.easyblog.top/16817163148422ef91829-4906-43eb-b610-de794ce5126e.png)
+
+#### 1.初始化Spring应用
+
+![](http://image.easyblog.top/168171805373176064d2c-3c37-4161-a131-26851efff3e0.png)
+
+SpringBoot程序启动第一步会`new`一个`SpringBootApplication`对象，在构造方法中主要干了下面几件事情：
+
+##### 设置应用类型
+
+这个过程非常重要，直接决定了项目的类型，应用类型分为三种，都在`WebApplicationType`这个枚举类中，如下：
+
+1. `NONE`：顾名思义，什么都没有，正常流程走，不额外的启动`web容器`，比如`Tomcat`。
+2. `SERVLET`：基于`servlet`的web程序，需要启动内嵌的`servlet`web容器，比如`Tomcat`。
+3. `REACTIVE`：基于`reactive`的web程序，需要启动内嵌`reactive`web容器。
+
+判断的依据很简单，就是加载对应的类，比如加载了`DispatcherServlet`等则会判断是`Servlet`的web程序。源码如下：
+
+![](http://image.easyblog.top/1681718157562ad08e6f4-b741-4b9f-99fc-2e3d0752c3f4.png)
+
+
+
+##### 设置初始化器（Initializer）
+
+初始化器`ApplicationContextInitializer`主要用于`IOC`容器刷新之前初始化一些组件，比如`ServletContextApplicationContextInitializer`。
+
+SpringBoot获取初始化器是使用了`Spring SPI机制`，即SpringBoot会使用`SpringFactoriesLoader`从spring-boot-autoconfigure包下的`/META-INFO/spring.factories`文件中加载配置的初始化器
+
+##### 设置监听器（Listener）
+
+监听器（`ApplicationListener`）这个概念在`Spring`中就已经存在，主要用于监听特定的事件(`ApplicationEvent`)，比如IOC容器刷新、容器关闭等。
+
+`Spring Boot`扩展了`ApplicationEvent`构建了`SpringApplicationEvent`这个抽象类，主要用于`Spring Boot`启动过程中触发的事件，比如程序启动中、程序启动完成等。如下图：
+
+![img](https://ask.qcloudimg.com/http-save/yehe-1346475/31ozdjsftd.png?imageView2/2/w/2560/h/7000)
+
+
+
+监听器的获取和初始化器的获取方式类似，都是借助了`Spring SPI机制`从spring-boot-autoconfigure包下的`/META-INFO/spring.factories`文件中加载配置的监听器。
+
+
+
+#### 2.执行run方法
+
+上面分析了`SpringApplication`的构建过程，一切都做好了铺垫，现在到了启动的过程了。
+
+##### **获取、启动运行过程监听器**
+
+运行过程监听器—`SpringApplicationRunListeners`，是用来监听应用程序启动过程的，接口的各个方法含义如下：
+
+```java
+public interface SpringApplicationRunListener {
+
+    // 在run()方法开始执行时，该方法就立即被调用，可用于在初始化最早期时做一些工作
+    void starting();
+    // 当environment构建完成，ApplicationContext创建之前，该方法被调用
+    void environmentPrepared(ConfigurableEnvironment environment);
+    // 当ApplicationContext构建完成时，该方法被调用
+    void contextPrepared(ConfigurableApplicationContext context);
+    // 在ApplicationContext完成加载，但没有被刷新前，该方法被调用
+    void contextLoaded(ConfigurableApplicationContext context);
+    // 在ApplicationContext刷新并启动后，CommandLineRunners和ApplicationRunner未被调用前，该方法被调用
+    void started(ConfigurableApplicationContext context);
+    // 在run()方法执行完成前该方法被调用
+    void running(ConfigurableApplicationContext context);
+    // 当应用运行出错时该方法被调用
+    void failed(ConfigurableApplicationContext context, Throwable exception);
+}
+```
+
+
+
+运行过程监听器的获取和初始化其实还是借助Spring SPI机制，通过调用了`loadFactoryNames()`方法从`spring.factories`文件中获取值，最终注入的是`EventPublishingRunListener`这个实现类，创建实例过程肯定是通过反射了，因此我们看看它的构造方法，如下图：
+
+![img](https://ask.qcloudimg.com/http-save/yehe-1346475/rkoun94vgu.png?imageView2/2/w/2560/h/7000)
+
+这个运行监听器内部有一个事件广播器（`SimpleApplicationEventMulticaster`），主要用来广播特定的事件(`SpringApplicationEvent`)来触发特定的监听器`ApplicationListener`。
+
+
+
+获取到监听器之后启动监听器就简单了，直接调用`starting()`方法，方法内部广播了`ApplicationStartingEvent`事件，这些事件可以在SpringBoot启动早期做一些初始化工作。
+
+
+
+##### 环境构建
+
+这一步主要用于加载系统配置以及用户的自定义配置(`application.properties`)，源码如下，在`run()`方法中：
+
+![](http://image.easyblog.top/1681722520494a4e199c2-f762-4f58-817d-50acf9f5beaf.png)
+
+`prepareEnvironment`方法内部广播了`ApplicationEnvironmentPreparedEvent`事件
+
+
+
+##### 创建IOC容器
+
+这一步主要根据`webApplicationType`决定创建IOC的类型，一般`Servlet`项目会创建的是`AnnotationConfigServletWebServerApplicationContext`。
+
+> 注意，这一步仅仅是创建了`IOC容器`，没有其他操作。
+
+![](http://image.easyblog.top/1681722704314f88c32c9-554b-403b-bf2a-8b5c7a391aa7.png)
+
+
+
+##### IOC容器前置处理
+
+这一步真是在刷新容器之前做准备，其中有一个非常关键的操作：将启动类注入容器，为后续的自动化配置奠定基础
+
+![](http://image.easyblog.top/168172299286388f28fe6-6e0e-45d7-a68f-22d8b7ce79f9.png)
+
+
+
+##### 刷新容器
+
+SpringBoot启动的核心操作，
+
+
+
+
+
+##### IOC容器后置操作
+
+
+
+
+
+
+
+总结
+
+
+
+### SpringBoot如何自定义starter?
