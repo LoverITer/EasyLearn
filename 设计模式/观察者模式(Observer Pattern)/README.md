@@ -77,7 +77,18 @@ MVC(Modew-View-Controller)架构中也应用了观察者模式，其中模型（
 
 ### 五、观察者模式的通用实现
 
-基于上面类图，我们简单实现一下观察者模式：
+在电商网站中， 商品时不时地会出现缺货情况。 可能会有客户对于缺货的特定商品表现出兴趣。 这一问题有三种解决方案：
+
+1. 客户以一定的频率查看商品的可用性。
+2. 电商网站向客户发送有库存的所有新商品。
+3. 客户只订阅其感兴趣的特定商品， 商品可用时便会收到通知。 同时， 多名客户也可订阅同一款产品。
+
+选项 3 是最具可行性的， 这其实就是观察者模式的思想。 观察者模式的主要组成部分有：
+
+- 会在有任何事发生时发布事件的主体。
+- 订阅了主体事件并会在事件发生时收到通知的观察者。
+
+
 
 #### 定义观察者接口
 
@@ -90,40 +101,41 @@ public interface Observer {
 
 
 
-#### 定义观察者具体实现类
+#### 定义具体用户观察者实现类
 
 ```java
-public class ConcreteObserver1 implements Observer{
-    @Override
-    public void update() {
-        System.out.println("观察者1收到更新信息，开始更新观察者1的数据....");
-    }
-}
+@Data
+public class Consumer implements Observer {
 
-public class ConcreteObserver2 implements Observer{
+
+    private String email;
+
+    public Consumer(String email) {
+        this.email = email;
+    }
+
     @Override
-    public void update() {
-        System.out.println("观察者2收到更新信息，开始更新观察者1的数据....");
+    public void update(ItemSubject itemSubject) {
+        IphoneItem item = null;
+        if (itemSubject instanceof IphoneItem) {
+            item = (IphoneItem) itemSubject;
+        }
+        System.out.printf("Sending email to customer %s for item %s\n", this.getEmail(), Objects.requireNonNull(item, "Error").getName());
     }
 }
 ```
 
 
 
-#### 定义被观察者抽象类
+#### 定义商品被关注抽象对象
 
 ```java
-public abstract class Subject {
-
+public abstract class ItemSubject {
     //观察者集合(关注此事件的对象)
     private final Vector<Observer> observers;
-  
-    //标志被观察者事件是否发生 
-    protected boolean isChange; 
 
-    public Subject() {
-        this.observers = new Vector<>();
-        this.isChange= false;
+    public ItemSubject() {
+        observers = new Vector<>();
     }
 
     public void subscribe(Observer observer) {
@@ -136,29 +148,34 @@ public abstract class Subject {
     }
 
     protected void notifyObserver() {
-        if (!isChange) return;
         this.observers.forEach(observer -> {
             // 遍历观察者列表，更新观察者数据
-            observer.update();
+            observer.update(this);
         });
     }
-
-    public abstract void doProcess();
 
 }
 ```
 
 
 
-#### 定义观察者具体实现
+#### 定义被关注商品具体实现
 
 ```java
-public class ConcreteSubject extends Subject{
+@Data
+public class IphoneItem extends ItemSubject {
 
-    @Override
-    public void doProcess() {
-        System.out.println("被观察者对象事件发生");
-        this.isChange = true;
+    private String name;
+    private boolean inStock;
+
+    public IphoneItem() {
+        super();
+        this.name = "[iphone14 pro max 暗夜紫]";
+    }
+
+    public void updateAvailability() {
+        System.out.printf("Item %s is now in stock\n", this.getName());
+        this.inStock = true;
         this.notifyObserver();
     }
 }
@@ -170,23 +187,32 @@ public class ConcreteSubject extends Subject{
 
 ```java
 public class Client {
+
     public static void main(String[] args) {
+        Consumer consumer1 = new Consumer("zhangsan@163.com");
+        Consumer consumer2 = new Consumer("lsp@qq.com");
 
-        ConcreteObserver1 concreteObserver1 = new ConcreteObserver1();
-        ConcreteObserver2 concreteObserver2 = new ConcreteObserver2();
-
-        //观察者监听目标事件
-        ConcreteSubject concreteSubject = new ConcreteSubject();
-        concreteSubject.subscribe(concreteObserver1);
-        concreteSubject.subscribe(concreteObserver2);
+        // 客户对商品添加关注
+        IphoneItem item = new IphoneItem();
+        item.subscribe(consumer1);
+        item.subscribe(consumer2);
         
-        // 目前事件发生
-        concreteSubject.doProcess();
+        // 更新库存并通知用户
+        item.updateAvailability();
     }
+    
 }
 ```
 
 执行结果：
 
-<img src="http://image.easyblog.top/16822317111345c033176-8078-4f70-b634-8dca04c84a63.png" style="zoom:50%;" />
+```txt
+Item [iphone14 pro max 暗夜紫] is now in stock
+Sending email to customer zhangsan@163.com for item [iphone14 pro max 暗夜紫]
+Sending email to customer lsp@qq.com for item [iphone14 pro max 暗夜紫]
+```
+
+
+
+
 
