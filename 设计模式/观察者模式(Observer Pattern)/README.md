@@ -58,6 +58,8 @@ Spring框架中大量使用了观察者模式来维护和管理Bean，基于JDK�
 
 4. **事件管理：ApplicationEventMulticaster**，用于事件监听器的注册和事件的广播。监听器的注册就是通过它来实现的，它的作用是把 Applicationcontext 发布的 Event 广播给它的监听器列表。
 
+关于Spring的事件机制，推荐一篇网上大佬写的文章，质量非常高：https://segmentfault.com/a/1190000020967936
+
 #### MVC架构中的观察模式
 
 MVC(Modew-View-Controller)架构中也应用了观察者模式，其中模型（Model）可以对应观察者模式中的观察目标，而视图（View）对应于观察者，控制器（Controller）就是中介者模式的应用
@@ -214,5 +216,119 @@ Sending email to customer lsp@qq.com for item [iphone14 pro max 暗夜紫]
 
 
 
+### 六、Spring中观察者模式使用案例
+
+现假设一个用户注册的案例场景：用户注册后，系统需要给用户发送邮件告知用户注册是否成功，需要给用户初始化积分，后续可能会添加其他的操作，如再发一条手机短信等，希望程序具有拓展性符合开闭原则.
+
+如果不使用事件机制，那么我们写出来的代码将会是下面这个样子：
+
+![image.png](https://segmentfault.com/img/bVbz71E)
+
+相信这段代码是大多数Java开发者会第一直觉写出来的代码，这么写其实没有什么问题。但是这么写，实际上并不是特别符合隐含的设计需求（开闭规则）,假设增加更多的注册项`Service`，我们需要修改`register`方法,并让`UserService`注入对应的`Service`。而实际上`register`并不关心这些"额外"的操作，如何将这些代码抽取出去，这时可以考虑`Event`机制.
 
 
+
+#### 定义用户注册事件
+
+`ApplicationEvent`是由`Spring`提供的所有`Event`类的基类,这里为了简单只传递`name`
+
+```java
+import org.springframework.context.ApplicationEvent;
+
+/**
+ * @author frank.huang
+ * @date 2023/04/23 16:20
+ */
+public class UserRegisterEvent extends ApplicationEvent {
+    /**
+     * Create a new ApplicationEvent.
+     *
+     * @param source the object on which the event initially occurred (never {@code null})
+     */
+    public UserRegisterEvent(Object source) {
+        super(source);
+    }
+}
+```
+
+
+
+#### 定义用户注册服务(事件发布者)
+
+服务交给`Spring`容器管理。`ApplicationEventPublishAware`是由`Spring`提供的用于`Service`注入`ApplicationEventPublisher`事件发布器的接口.使用这个接口,我们的`Service`就拥有发布事件的能力了
+
+用户注册后,不再是显示调用其他的业务`Service`,而是发布一个用户注册事件
+
+```java
+@Slf4j
+@Service
+public class UserService implements ApplicationEventPublisherAware {
+
+
+    private ApplicationEventPublisher applicationEventPublisher;
+
+
+    @Override
+    public void setApplicationEventPublisher(@NonNull ApplicationEventPublisher applicationEventPublisher) {
+        this.applicationEventPublisher = applicationEventPublisher;
+    }
+    
+    /**
+     * 用户注册
+     *
+     * @param name
+     */
+    public void register(String name) {
+        System.out.printf("用户 %s 开始注册\n", name);
+        applicationEventPublisher.publishEvent(new UserRegisterEvent(name));
+        System.out.printf("用户 %s 注册完成\n", name);
+    }
+}
+```
+
+
+
+#### 定义邮件服务,积分服务,其他服务(事件订阅者)
+
+事件订阅者的服务同样需要托管于`Spring`容器，`ApplicationListener<E extends ApplicationEvent>`接口是`Spring`提供的事件订阅者必须实现的接口,我们一般把`Service`关心的事件作为泛型传入。事件处理:`ApplicationEvent#getSource`拿到事件的具体内容,本例中为`name`.
+
+```java
+@Service
+public class EmailService implements ApplicationListener<UserRegisterEvent> {
+    
+    @Override
+    public void onApplicationEvent(UserRegisterEvent event) {
+        System.out.printf("用户 %s 注册成功，发送邮件....\n",event.getSource());
+    }
+}
+
+
+@Service
+public class ScoreService implements ApplicationListener<UserRegisterEvent> {
+    
+    @Override
+    public void onApplicationEvent(UserRegisterEvent event) {
+        System.out.printf("用户 %s 注册成功，初始化积分....\n",event.getSource());
+    }
+}
+
+@Service
+public class OtherService implements ApplicationListener<UserRegisterEvent> {
+    
+    @Override
+    public void onApplicationEvent(UserRegisterEvent event) {
+        System.out.printf("用户 %s 注册成功，初始其他....\n",event.getSource());
+    }
+}
+```
+
+
+
+启动服务，调用register方法，入参 zhangsan 运行结果：
+
+```text
+用户 zhangsan 开始注册
+用户 zhangsan 注册成功，发送邮件....
+用户 zhangsan 注册成功，初始化积分....
+用户 zhangsan 注册完成
+```
